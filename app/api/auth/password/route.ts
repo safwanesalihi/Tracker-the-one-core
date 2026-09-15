@@ -1,5 +1,5 @@
 import { getAppUser, sessionCookie, sessionSettings, sessionTokenFrom } from '@/lib/auth';
-import { requestOrigin } from '@/lib/auth-settings';
+import { sameOrigin } from '@/lib/auth-settings';
 import { changePassword, changePasswordInput, PasswordAuthError, signIn, signInInput } from '@/lib/password-auth';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ const json = (data: unknown, status = 200, headers: Record<string, string> = {})
 export async function POST(req: Request) {
   const settings = sessionSettings();
   if (!settings) return json({ error: 'La connexion n’est pas encore configurée.' }, 503);
-  if (requestOrigin(req) !== settings.origin || req.headers.get('origin') !== settings.origin) return json({ error: 'Origine non autorisée.' }, 403);
+  if (!sameOrigin(req)) return json({ error: 'Origine non autorisée.' }, 403);
   if (!req.headers.get('content-type')?.includes('application/json')) return json({ error: 'Format invalide.' }, 415);
   let body: unknown;
   try { body = await req.json(); } catch { return json({ error: 'Requête invalide.' }, 400); }

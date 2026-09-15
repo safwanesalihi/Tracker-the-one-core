@@ -46,6 +46,9 @@ await post({ action: 'sign-in', email: 'stranger@example.test', password: 'whate
 await post({ action: 'sign-in', email: 'contact@the1core.com', password: 'not-the-owner-password' }, { status: 401 });
 eq((await pg.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 0, 'no rows written by refused attempts');
 await post({ action: 'sign-in', email: 'contact@the1core.com', password: 'TOC-owner-test-password' }, { status: 403, headers: { origin: 'https://evil.test' } });
+// Same-origin is what matters: the *.vercel.app address works alongside the custom domain, plain http elsewhere does not.
+await post({ action: 'sign-in', email: 'contact@the1core.com', password: 'wrong-on-purpose' }, { status: 401, headers: { origin: 'https://the-one-tracker.vercel.app', host: 'the-one-tracker.vercel.app', 'x-forwarded-proto': 'https' } });
+await post({ action: 'sign-in', email: 'contact@the1core.com', password: 'TOC-owner-test-password' }, { status: 403, headers: { origin: 'http://tracker.the1core.com', host: 'tracker.the1core.com', 'x-forwarded-proto': 'http' } });
 
 // The owner is seeded from the environment on first sign-in and owns the studio.
 const owner = await post({ action: 'sign-in', email: 'CONTACT@the1core.com', password: 'TOC-owner-test-password' });

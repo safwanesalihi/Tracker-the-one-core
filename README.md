@@ -98,7 +98,7 @@ Backups: Supabase Pro takes daily backups; `pg_dump "$DIRECT_URL" > backup.sql` 
 2. Environment variables (Production): `AUTH_URL=https://<your-domain>`, `OWNER_EMAIL`, `OWNER_PASSWORD`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET` (32+ random chars).
 3. The cron in [vercel.json](vercel.json) is picked up on deploy.
 
-Sign-in is refused on preview deployments by design: `AUTH_URL` must equal the exact origin the browser uses.
+Sign-in works on every https address the app is served from (the custom domain and the `*.vercel.app` address alike): the guard is a same-origin check. `AUTH_URL` is the canonical public address — it sets the cookie's Secure flag and the links in invitation e-mails — so set it to the domain you give people.
 
 ## Team backend
 
