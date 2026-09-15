@@ -309,3 +309,8 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 [data-slot=sidebar][data-mobile=true] .keyboard-hint{color:#737985}
 [data-slot=sidebar][data-mobile=true] .section-plus{color:#a2a7b2}
 [data-slot=sidebar][data-mobile=true] .workspace-switch{color:#a2a7b2}
+
+/* The top bar (menu button, search, refresh) stays visible while scrolling — essential on phones. */
+.topbar{position:sticky;top:0;z-index:30;background:#ffffffee;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.preview-banner{position:sticky;top:51px;z-index:29}
+@media (max-width:767px){.preview-banner{top:58px}}
