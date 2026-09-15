@@ -9,6 +9,7 @@ const errors: Record<string, string> = {
   AccessDenied: 'Accès sur invitation uniquement. Cette adresse Google n’a pas été invitée par le studio (ou son e-mail n’est pas vérifié).',
   InviteCodeRequired: 'Cette adresse a bien une invitation : saisissez le code d’invitation fourni par le studio, puis continuez avec Google.',
   InvalidInviteCode: 'Code d’invitation invalide pour cette adresse Google. Vérifiez le code auprès du studio.',
+  UsePassword: 'Cette adresse a déjà un compte avec mot de passe. Connectez-vous avec votre e-mail et votre mot de passe.',
   OAuthAccountNotLinked: 'Ce compte n’est pas lié à cet espace. Contactez le propriétaire.',
   OAuthCallbackError: 'La connexion a expiré ou n’a pas pu être vérifiée. Réessayez.',
   Configuration: 'La connexion Google n’est pas encore configurée.',

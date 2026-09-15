@@ -86,7 +86,7 @@ eq([carolStudio.workspace.id, carolStudio.workspace.role], [snapshot.workspace.i
 // A Google-created account can never get a password attached from the login form.
 await pg.query("INSERT INTO users (id, name, email, email_verified) VALUES ('g1', 'Google Person', 'google@studio.test', now())");
 await post({ action: 'sign-up', email: 'google@studio.test', password: 'takeover-attempt-1234', name: 'Attacker' }, { status: 409 });
-await post({ action: 'sign-in', email: 'google@studio.test', password: 'takeover-attempt-1234' }, { status: 401 });
+await post({ action: 'sign-in', email: 'google@studio.test', password: 'takeover-attempt-1234' }, { status: 409 });
 eq((await pg.query("SELECT password_hash FROM users WHERE id = 'g1'")).rows[0].password_hash, null);
 
 // Closed studio: with OWNER_EMAIL set, only the owner or an invited address gets in.

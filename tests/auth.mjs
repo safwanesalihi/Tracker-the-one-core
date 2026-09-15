@@ -216,6 +216,11 @@ try {
   assert.equal((await (await records.GET(identityRequest(returning.jar))).json()).workspace.id, 'ws:host');
   const existingFlow = await begin({ sub: 'google-subject-b', email: 'second@example.test' }); await finish(existingFlow);
   assert.ok(await getAppUser(identityRequest(existingFlow.jar)), 'accounts created earlier keep signing in');
+  // The reverse: a password account's address cannot come in through Google — it is told to use its password.
+  await pg.query("INSERT INTO users (id, name, email, password_hash) VALUES ('pw', 'Password Person', 'password@example.test', 'scrypt$x')");
+  const viaGoogle = await begin({ sub: 'google-subject-e', email: 'password@example.test' }); const told = await finish(viaGoogle);
+  assert.match(told.headers.get('location') ?? '', /error=UsePassword/);
+  assert.equal(await getAppUser(identityRequest(viaGoogle.jar)), null);
   delete globalThis.authTestEnv.OWNER_EMAIL;
   console.log('Google auth checks passed: full mocked OAuth, PKCE/state/nonce, CSRF, verified identity, userinfo profile, sessions, revocation, expiry and workspace isolation.');
 } finally { globalThis.fetch = realFetch; await pg.close(); }

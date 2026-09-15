@@ -32,6 +32,11 @@ export async function consumeInviteCode(db: Db, email: string, code: string) {
  * New accounts: the owner, or an invitation whose code has been entered; otherwise a reason to show on the login page.
  */
 export async function googleAdmission(db: Db, email: string, isExistingAccount: boolean, code: string | null) {
+  if (!isExistingAccount) {
+    // Same address, other method: never link silently; say which door to use.
+    const other = await db.query<{ password_hash: string | null }>('SELECT password_hash FROM users WHERE email = $1', [email.trim().toLowerCase()]);
+    if (other.length) return other[0].password_hash ? 'UsePassword' : 'AccessDenied';
+  }
   if (code) {
     if (!(await consumeInviteCode(db, email, code))) return 'InvalidInviteCode';
     return 'ok';

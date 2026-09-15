@@ -63,7 +63,9 @@ export async function signInWithPassword(input: PasswordCredentials) {
     if (!input.name) throw new PasswordAuthError('Indiquez votre nom.');
     const existing = (await db.query<UserRow>('SELECT id, password_hash FROM users WHERE email = $1', [email]))[0];
     // Never attach a password to an account created through Google: that would let anyone who knows the e-mail take it over.
-    if (existing) throw new PasswordAuthError('Impossible de créer un compte avec cette adresse. Si vous utilisez Google, continuez avec Google.', 409);
+    if (existing) throw new PasswordAuthError(existing.password_hash
+      ? 'Cette adresse a déjà un compte. Utilisez « Se connecter » avec votre mot de passe.'
+      : 'Cette adresse est connectée avec Google. Utilisez « Continuer avec Google ».', 409);
     if (closedStudio() && !isOwnerEmail(email) && !code) {
       throw new PasswordAuthError('Accès sur invitation : saisissez le code d’invitation fourni par le studio.', 403);
     }
@@ -88,6 +90,7 @@ export async function signInWithPassword(input: PasswordCredentials) {
     throw new PasswordAuthError(`Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil((lockedUntil.getTime() - Date.now()) / 60000))} min.`, 429);
   }
   const ok = await verifyPassword(input.password, user?.password_hash ?? 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AA==');
+  if (user && !user.password_hash) throw new PasswordAuthError('Cette adresse est connectée avec Google. Utilisez « Continuer avec Google ».', 409);
   if (!user || !user.password_hash || !ok) {
     if (user?.password_hash) {
       const failures = (user.failed_logins ?? 0) + 1;
