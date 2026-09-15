@@ -1,7 +1,7 @@
 // Arabic (Morocco). Keys are the French source strings (see lib/i18n/index.ts).
 export const ar: Record<string, string> = {
-  "Gère les clients existants, projets, tâches, archivage, verrou J−7, pilotage et invitations. La création de clients est réservée au propriétaire.": "يدير العملاء الحاليين والمشاريع والمهام والأرشفة وقفل ي−7 والقيادة والدعوات. إنشاء العملاء مخصص للمالك.",
-  "Fait avancer ses tâches ou celles à prendre, commente, modifie les clients existants et gère les sous-projets. Équipe en lecture seule. Ni création de clients ou de tâches, ni validation client, ni archivage, ni pilotage.": "ينجز المهام المسندة إليه أو المتاحة ويعلق ويعدل العملاء الحاليين ويدير المشاريع الفرعية. الفريق للقراءة فقط. لا ينشئ عملاء أو مهام ولا يعتمد نيابة عن العميل ولا يؤرشف ولا يصل إلى القيادة.",
+  "Gère les clients existants, projets, tâches, archivage, verrou J−7, tableau de bord et invitations. La création de clients est réservée au propriétaire.": "يدير العملاء الحاليين والمشاريع والمهام والأرشفة وقفل ي−7 ولوحة التحكم والدعوات. إنشاء العملاء مخصص للمالك.",
+  "Fait avancer ses tâches ou celles à prendre, commente et gère les sous-projets. Équipe en lecture seule. Ni création ni modification de clients, ni création de tâches, ni validation client, ni archivage, ni tableau de bord.": "ينجز المهام المسندة إليه أو المتاحة ويعلق ويدير المشاريع الفرعية. الفريق للقراءة فقط. لا ينشئ عملاء ولا يعدلهم ولا ينشئ مهامًا ولا يعتمد نيابة عن العميل ولا يؤرشف ولا يصل إلى لوحة التحكم.",
   "Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.": "فقط العميل أو المالك أو المدير يمكنه اعتماد التسليم.",
   "Copié": "تم النسخ",
   "Copie impossible. Sélectionnez le mot de passe pour le copier.": "تعذر النسخ. حدد كلمة المرور وانسخها يدوياً.",
@@ -248,7 +248,7 @@ export const ar: Record<string, string> = {
   '{n} sous-projets': '{n} مشاريع فرعية',
   'Une idée claire.': 'فكرة واضحة.',
   'Une marque singulière.': 'علامة فريدة.',
-  'Unique. Tout l’espace, le pilotage et la gestion des membres.': 'وحيد. كامل المساحة والقيادة وإدارة الأعضاء.',
+  'Unique. Tout l’espace, le tableau de bord et la gestion des membres.': 'وحيد. كامل المساحة ولوحة التحكم وإدارة الأعضاء.',
   'Paramètres': 'الإعدادات',
   'Votre photo, votre nom et la langue de l’application.': 'صورتكم واسمكم ولغة التطبيق.',
   'Photo de profil': 'صورة الملف الشخصي',
@@ -508,6 +508,7 @@ export const ar: Record<string, string> = {
   'Ses éléments associés seront masqués des vues actives.': 'ستُخفى عناصره المرتبطة من العروض النشطة.',
   'Seuls le propriétaire et les administrateurs peuvent gérer les membres.': 'المالك والمديرون فقط يمكنهم إدارة الأعضاء.',
   'Seuls le propriétaire et les administrateurs peuvent inviter.': 'المالك والمديرون فقط يمكنهم الدعوة.',
+  'Seuls le propriétaire et les administrateurs peuvent modifier la fiche d’un client.': 'المالك والمديرون فقط يمكنهم تعديل صفحة العميل.',
   'Seuls le propriétaire et les administrateurs peuvent renvoyer une invitation.': 'المالك والمديرون فقط يمكنهم إعادة إرسال دعوة.',
   'Seuls le propriétaire et les administrateurs peuvent supprimer une tâche.': 'المالك والمديرون فقط يمكنهم حذف مهمة.',
   'Seuls les administrateurs peuvent archiver ou restaurer des éléments.': 'المديرون فقط يمكنهم أرشفة العناصر أو استعادتها.',

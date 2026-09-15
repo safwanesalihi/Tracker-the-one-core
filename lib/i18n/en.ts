@@ -1,7 +1,7 @@
 // English. Keys are the French source strings (see lib/i18n/index.ts).
 export const en: Record<string, string> = {
-  "Gère les clients existants, projets, tâches, archivage, verrou J−7, pilotage et invitations. La création de clients est réservée au propriétaire.": "Manages existing clients, projects, tasks, archiving, the D−7 lock, reporting and invitations. Only the owner creates clients.",
-  "Fait avancer ses tâches ou celles à prendre, commente, modifie les clients existants et gère les sous-projets. Équipe en lecture seule. Ni création de clients ou de tâches, ni validation client, ni archivage, ni pilotage.": "Works on assigned or unassigned tasks, comments, edits existing clients and manages sub-projects. Team is read-only. Cannot create clients or tasks, approve for clients, archive, or access reporting.",
+  "Gère les clients existants, projets, tâches, archivage, verrou J−7, tableau de bord et invitations. La création de clients est réservée au propriétaire.": "Manages existing clients, projects, tasks, archiving, the D−7 lock, the dashboard and invitations. Only the owner creates clients.",
+  "Fait avancer ses tâches ou celles à prendre, commente et gère les sous-projets. Équipe en lecture seule. Ni création ni modification de clients, ni création de tâches, ni validation client, ni archivage, ni tableau de bord.": "Works on assigned or unassigned tasks, comments and manages sub-projects. Team is read-only. Cannot create or edit clients, create tasks, approve for clients, archive, or access the dashboard.",
   "Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.": "Only the client, owner or an administrator can approve a deliverable.",
   "Copié": "Copied",
   "Copie impossible. Sélectionnez le mot de passe pour le copier.": "Could not copy. Select the password and copy it manually.",
@@ -249,7 +249,7 @@ export const en: Record<string, string> = {
   '{n} sous-projets': '{n} sub-projects',
   'Une idée claire.': 'A clear idea.',
   'Une marque singulière.': 'A singular brand.',
-  'Unique. Tout l’espace, le pilotage et la gestion des membres.': 'Unique. The whole workspace, steering and member management.',
+  'Unique. Tout l’espace, le tableau de bord et la gestion des membres.': 'Unique. The whole workspace, the dashboard and member management.',
   'Paramètres': 'Settings',
   'Votre photo, votre nom et la langue de l’application.': 'Your photo, your name and the app language.',
   'Photo de profil': 'Profile picture',
@@ -509,6 +509,7 @@ export const en: Record<string, string> = {
   'Ses éléments associés seront masqués des vues actives.': 'Its related items will be hidden from the active views.',
   'Seuls le propriétaire et les administrateurs peuvent gérer les membres.': 'Only the owner and administrators can manage members.',
   'Seuls le propriétaire et les administrateurs peuvent inviter.': 'Only the owner and administrators can invite.',
+  'Seuls le propriétaire et les administrateurs peuvent modifier la fiche d’un client.': 'Only the owner and administrators can edit a client’s page.',
   'Seuls le propriétaire et les administrateurs peuvent renvoyer une invitation.': 'Only the owner and administrators can resend an invitation.',
   'Seuls le propriétaire et les administrateurs peuvent supprimer une tâche.': 'Only the owner and administrators can delete a task.',
   'Seuls les administrateurs peuvent archiver ou restaurer des éléments.': 'Only administrators can archive or restore items.',

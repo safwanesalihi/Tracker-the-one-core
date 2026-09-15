@@ -89,6 +89,8 @@ as(yasmine);
 const newProject = await post({ action: 'create', kind: 'project', data: { name: 'Sous-projet créé par un membre', clientId: newClient.id } });
 ok(newProject.records.some((r) => r.id === newProject.id), 'members can still create sub-projects for existing clients');
 await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client créé par un membre', archived: true } }, 403);
+// A client's own page (brief, contacts, logo/banner) is studio-owned: a member cannot edit it at all, even without touching archived.
+await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client renommé par un membre' } }, 403);
 await post({ action: 'invite-member', email: 'z@z.test', role: 'creative' }, 403);
 await post({ action: 'demo' }, 403);
 await post({ action: 'request', clientId: c1.id, data: { name: 'Demande' } }, 403);
@@ -128,6 +130,10 @@ for (const role of ['admin', 'viewer', 'client']) {
   as(amine);
   await post({ action: 'create', kind: 'client', data: { name: 'Forbidden client' } }, 403);
   await post({ action: 'demo' }, 403);
+  if (role === 'admin') {
+    const renamed = await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client renommé par un admin' } });
+    eq(renamed.records.find((r) => r.id === newClient.id).name, 'Client renommé par un admin', 'an admin can edit an existing client’s page');
+  }
 }
 as(owner);
 eq(ids(await get(), 'client').length, 3, 'denied creations and demo calls persist no clients');

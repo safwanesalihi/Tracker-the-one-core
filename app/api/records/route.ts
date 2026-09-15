@@ -5,7 +5,7 @@ import { env } from '@/lib/env';
 import { fields, inviteFields, requestFields } from '@/lib/validation';
 import { RecordItem, sampleRecords } from '@/lib/model';
 import {
-  canManageMembers, isStudioRole, isWorkspaceRole, roleLabels,
+  canManageMembers, isManager, isStudioRole, isWorkspaceRole, roleLabels,
   type WorkspaceContext, type WorkspaceMember, type WorkspaceSummary,
 } from '@/lib/workspace';
 import {
@@ -539,6 +539,11 @@ export async function POST(req: Request) {
     if (!canWrite(workspace.role)) return response({ error: 'Votre rôle est en lecture seule.' }, 403);
     if (body.action === 'create' && body.kind === 'client' && workspace.role !== 'owner') {
       return response({ error: 'Seul le propriétaire peut ajouter des clients.' }, 403);
+    }
+    // The client's own page (brief, contacts, links, logo/banner) is studio-owned: only the
+    // owner and admins edit it. A member still edits the client's sub-projects and tasks.
+    if (body.kind === 'client' && !isManager(workspace.role)) {
+      return response({ error: 'Seuls le propriétaire et les administrateurs peuvent modifier la fiche d’un client.' }, 403);
     }
     const rows = rowsNow;
     const existing =

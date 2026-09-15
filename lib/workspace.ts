@@ -29,9 +29,9 @@ export const roleLabels: Record<WorkspaceRole, string> = {
   client: 'Client',
 };
 export const roleDescriptions: Record<WorkspaceRole, string> = {
-  owner: 'Unique. Tout l’espace, le pilotage et la gestion des membres.',
-  admin: 'Gère les clients existants, projets, tâches, archivage, verrou J−7, pilotage et invitations. La création de clients est réservée au propriétaire.',
-  creative: 'Fait avancer ses tâches ou celles à prendre, commente, modifie les clients existants et gère les sous-projets. Équipe en lecture seule. Ni création de clients ou de tâches, ni validation client, ni archivage, ni pilotage.',
+  owner: 'Unique. Tout l’espace, le tableau de bord et la gestion des membres.',
+  admin: 'Gère les clients existants, projets, tâches, archivage, verrou J−7, tableau de bord et invitations. La création de clients est réservée au propriétaire.',
+  creative: 'Fait avancer ses tâches ou celles à prendre, commente et gère les sous-projets. Équipe en lecture seule. Ni création ni modification de clients, ni création de tâches, ni validation client, ni archivage, ni tableau de bord.',
   viewer: 'Lecture seule de tout l’espace, sans modification ni commentaire.',
   client: 'Portail client uniquement : ses livrables, validation, retours, demandes et calendrier. Rien d’autre.',
 };

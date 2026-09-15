@@ -907,6 +907,14 @@ export default function Tracker() {
       setError(tr("Seul le propriétaire peut ajouter des clients."));
       return;
     }
+    if (type === "client" && record && !manager) {
+      setError(
+        tr(
+          "Seuls le propriétaire et les administrateurs peuvent modifier la fiche d’un client.",
+        ),
+      );
+      return;
+    }
     if (type === "task" && !record && (!workspace || !manager)) {
       setError(
         tr("Les tâches sont créées par le propriétaire ou un administrateur."),
@@ -2358,9 +2366,7 @@ export default function Tracker() {
           <ClientImages
             client={client}
             workspaceId={workspace?.id || ""}
-            canEdit={
-              !!workspace && workspace.role !== "viewer" && !client.archived
-            }
+            canEdit={manager && !client.archived}
             onChange={(changes, message) => update(client, changes, message)}
             onError={setError}
           />
@@ -2385,7 +2391,7 @@ export default function Tracker() {
             )
           }
           action={
-            <button className="btn" disabled={!writable} onClick={() => open("client", client)}>
+            <button className="btn" disabled={!manager} onClick={() => open("client", client)}>
               {tr("Modifier la fiche")}
             </button>
           }

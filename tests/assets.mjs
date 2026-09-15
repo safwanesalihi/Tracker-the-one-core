@@ -72,6 +72,16 @@ await mutate({ action: 'update', kind: 'client', id: client.id, revision: 3, dat
 eq((await get(banner)).status, 404, 'removed banner dropped');
 eq((await pg.query('SELECT count(*)::int AS n FROM assets')).rows[0].n, 2, 'only the live logo and the first unattached upload remain');
 
+// Members (creative) cannot touch a client's logo/banner either — that page is studio-owned — but they keep their own picture.
+const member = { userId: 'member', fullName: 'Yasmine', displayName: 'Yasmine', email: 'yasmine@studio.test' };
+await pg.query("INSERT INTO users (id, name, email, password_hash) VALUES ('member', 'Yasmine', 'yasmine@studio.test', 'x')");
+await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role, name, email) VALUES ($1, 'member', 'creative', 'Yasmine', 'yasmine@studio.test')", [WS]);
+globalThis.testUser = member;
+eq((await send('logo', new File([png], 'x.png', { type: 'image/png' }))).status, 403, 'members cannot upload client images either');
+const memberAvatar = (await send('avatar', new File([png], 'me.png', { type: 'image/png' }))).data.id;
+eq(typeof memberAvatar, 'string', 'members can still upload their own picture');
+globalThis.testUser = owner;
+
 // Profile pictures: any member (a client included) sets their own; replaced pictures are dropped; visible to any signed-in user.
 const contact = { userId: 'contact', fullName: 'Amina', displayName: 'Amina', email: 'amina@client.test' };
 await pg.query("INSERT INTO users (id, name, email, password_hash) VALUES ('contact', 'Amina', 'amina@client.test', 'x')");

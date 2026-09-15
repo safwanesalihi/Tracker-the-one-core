@@ -38,7 +38,7 @@ async function post(body, { status: expected = 200, headers = {}, cookie = '' } 
 const api = (cookie, extra = {}) => records.GET(new Request(origin + '/api/records', { headers: { cookie, ...extra } }));
 const mutate = (cookie, body) => records.POST(new Request(origin + '/api/records', { method: 'POST', headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
 
-eq((await status.GET().json()), { passwordConfigured: true, ownerConfigured: true, mailConfigured: false });
+eq((await status.GET().json()), { passwordConfigured: true, ownerConfigured: true, mailConfigured: false, authUrl: origin });
 
 // Nobody can sign up; unknown addresses and wrong owner passwords are simply refused.
 await post({ action: 'sign-up', email: 'x@y.test', password: 'whatever-long-enough', name: 'X' }, { status: 400 });

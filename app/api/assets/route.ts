@@ -2,7 +2,7 @@
 import { getAppUser } from '@/lib/auth';
 import { requestOrigin } from '@/lib/auth-settings';
 import { database } from '@/lib/database';
-import { isWorkspaceRole } from '@/lib/workspace';
+import { isManager, isWorkspaceRole } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +25,8 @@ export async function POST(req: Request) {
   const kind = String(form.get('kind') ?? '');
   const file = form.get('file');
   if (!assetLimits.kinds.includes(kind as 'logo' | 'banner' | 'avatar')) return json({ error: 'Type d’image inconnu.' }, 400);
-  // Anyone may change their own picture; client images belong to the studio roles.
-  if (kind !== 'avatar' && (membership.role === 'viewer' || membership.role === 'client')) return json({ error: 'Votre rôle ne permet pas de modifier les images.' }, 403);
+  // Anyone may change their own picture; a client's logo/banner is studio-owned, owner/admin only.
+  if (kind !== 'avatar' && !isManager(membership.role)) return json({ error: 'Votre rôle ne permet pas de modifier les images.' }, 403);
   if (!(file instanceof File)) return json({ error: 'Aucun fichier reçu.' }, 400);
   if (!assetLimits.types.includes(file.type)) return json({ error: 'Formats acceptés : PNG, JPEG, WebP.' }, 415);
   if (file.size === 0 || file.size > assetLimits.maxBytes) return json({ error: 'Image trop lourde (1,5 Mo maximum après redimensionnement).' }, 413);
