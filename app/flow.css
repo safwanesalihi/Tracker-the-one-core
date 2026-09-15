@@ -317,3 +317,8 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 
 /* Portal drawer on mobile: the brand block stacks like the desktop sidebar. */
 [data-slot=sidebar][data-mobile=true] .brand:has(.brand-client){flex-direction:column;align-items:flex-start}
+/* Sidebar profile: the name block opens the profile dialog. */
+.user-row .user-profile{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:4px;margin:-4px;border:0;border-radius:8px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.user-row .user-profile:hover,.user-row .user-profile:focus-visible{background:#ffffff0f;outline:none}
+.user-row .user-profile>div{flex:1;min-width:0}
+.portal-rtl .user-row .user-profile{text-align:right}

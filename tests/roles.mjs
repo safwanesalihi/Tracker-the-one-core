@@ -114,5 +114,13 @@ await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { na
 as(owner);
 eq(ids(await get(), 'task').length, 5, 'the owner sees everything');
 eq(ids(await get(), 'client').length, 3, 'including the member-created client');
+// Anyone can rename their own profile; the roster and greeting data follow, e-mail stays.
+as(yasmine);
+await post({ action: 'update-profile', name: ' ' }, 400);
+const renamed = await post({ action: 'update-profile', name: '  Yasmine   Alaoui ' });
+eq([renamed.user.name, renamed.user.email], ['Yasmine Alaoui', 'yasmine@studio.test'], 'trimmed name returned with the payload');
+as(owner);
+eq((await get()).members.find((m) => m.userId === yasmine.userId).name, 'Yasmine Alaoui', 'roster reflects the new name');
+
 await pg.close();
 console.log(`${checks} role checks passed: single owner, member scope (clients, own + unassigned tasks, no task creation, read-only team), client portal scope.`);

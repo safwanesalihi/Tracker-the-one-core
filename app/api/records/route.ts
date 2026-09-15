@@ -440,6 +440,18 @@ export async function POST(req: Request) {
       return result();
     }
 
+    // ----- own profile: the display name used in greetings, comments and receipts -----
+
+    if (body.action === 'update-profile') {
+      const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
+      if (name.length < 2 || name.length > 80) return response({ error: 'Indiquez un nom (2 à 80 caractères).' }, 400);
+      await db.transaction(async (tx) => {
+        await tx.query('UPDATE users SET name = $2 WHERE id = $1', [user.userId, name]);
+        await tx.query('UPDATE workspace_members SET name = $2 WHERE user_id = $1', [user.userId, name]);
+      });
+      return result({ user: { id: user.userId, name, email: user.email } });
+    }
+
     if (body.action === 'mark-read') {
       if (!isStudioRole(workspace.role)) return response({ error: 'Action réservée au studio.' }, 403);
       const ids = Array.isArray(body.ids) ? body.ids.filter((id: unknown): id is string => typeof id === 'string' && id.startsWith('evt:')).slice(0, 200) : [];
