@@ -213,9 +213,12 @@
 @media (max-width:700px){.client-banner{height:120px}.client-hero-mark{margin-left:16px}.client-mark-xl{width:68px;height:68px}}
 
 /* In-place status change + row actions */
-.status-pick{border:0!important;background:transparent!important;padding:0!important;height:auto!important;min-height:0!important;box-shadow:none!important;gap:4px}
-.status-pick>svg{width:12px!important;height:12px!important;opacity:.5}
-.status-pick:hover .status{filter:brightness(.96)}
+.status-pick{border:0!important;background:transparent!important;padding:0!important;height:auto!important;min-height:0!important;box-shadow:none!important;gap:0;cursor:pointer}
+.status-pick>svg{display:none!important}
+.status-pick .status{pointer-events:none;padding-right:6px;transition:filter .12s,box-shadow .12s}
+.status-pick .status-caret{width:11px!important;height:11px!important;opacity:.55;margin-left:2px;display:inline!important;color:inherit!important}
+.status-pick:hover .status,.status-pick[data-state=open] .status{filter:brightness(.94);box-shadow:0 0 0 2px #fff,0 0 0 3px #d9dde3}
+.status-pick:disabled{cursor:not-allowed}
 .row-actions{display:inline-flex;gap:2px;margin-left:auto;opacity:0;transition:opacity .15s}
 tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .row-actions .icon-button{width:28px;height:28px}
