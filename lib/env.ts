@@ -5,6 +5,7 @@ export type AppEnvironment = AuthEnvironment & {
   DATABASE_URL?: string;
   DIRECT_URL?: string;
   CRON_SECRET?: string;
+  OWNER_EMAIL?: string;   // comma-separated; when set, only these addresses open a workspace without an invitation
   NODE_ENV?: string;
 };
 

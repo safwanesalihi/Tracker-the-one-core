@@ -6,7 +6,7 @@ import { startGoogleSignIn } from '@/lib/auth-client';
 import LoginShowcase from '@/app/login-showcase';
 
 const errors: Record<string, string> = {
-  AccessDenied: 'La connexion a été refusée. Utilisez un compte Google avec une adresse e-mail vérifiée.',
+  AccessDenied: 'Accès sur invitation uniquement. Cette adresse Google n’a pas été invitée par le studio (ou son e-mail n’est pas vérifié).',
   OAuthAccountNotLinked: 'Ce compte n’est pas lié à cet espace. Contactez le propriétaire.',
   OAuthCallbackError: 'La connexion a expiré ou n’a pas pu être vérifiée. Réessayez.',
   Configuration: 'La connexion Google n’est pas encore configurée.',

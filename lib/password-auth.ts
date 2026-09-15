@@ -5,6 +5,7 @@ import { database, type Db } from '@/lib/database';
 import { hashToken } from '@/lib/auth-adapter';
 import { hashPassword, passwordPolicy, verifyPassword } from '@/lib/password';
 import { inviteId } from '@/lib/workspace';
+import { closedStudio, isOwnerEmail } from '@/lib/access';
 
 export const lockout = { attempts: 5, minutes: 15 };
 const sessionLifetimeSeconds = 60 * 60 * 24 * 7;
@@ -63,6 +64,9 @@ export async function signInWithPassword(input: PasswordCredentials) {
     const existing = (await db.query<UserRow>('SELECT id, password_hash FROM users WHERE email = $1', [email]))[0];
     // Never attach a password to an account created through Google: that would let anyone who knows the e-mail take it over.
     if (existing) throw new PasswordAuthError('Impossible de créer un compte avec cette adresse. Si vous utilisez Google, continuez avec Google.', 409);
+    if (closedStudio() && !isOwnerEmail(email) && !code) {
+      throw new PasswordAuthError('Accès sur invitation : saisissez le code d’invitation fourni par le studio.', 403);
+    }
     if (code) {
       const invite = await db.query('SELECT 1 FROM workspace_members WHERE user_id = $1 AND invite_code = $2', [inviteId(email), code]);
       if (!invite.length) throw new PasswordAuthError('Code d’invitation invalide pour cette adresse.', 400);

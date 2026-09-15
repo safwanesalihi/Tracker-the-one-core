@@ -69,6 +69,7 @@ const { privateKey, publicKey } = await generateKeyPair('RS256');
 const jwk = { ...await exportJWK(publicKey), kid: 'test-key', alg: 'RS256', use: 'sig' };
 const codes = new Map();
 const accessTokens = new Map(); // access token → profile the userinfo endpoint returns
+let userinfoCalls = 0;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const url = String(input);
@@ -97,6 +98,7 @@ globalThis.fetch = async (input, init) => {
   if (url === 'https://openidconnect.googleapis.com/v1/userinfo') {
     const claims = accessTokens.get((init?.headers?.authorization ?? init?.headers?.Authorization ?? new Headers(init?.headers).get('authorization') ?? '').replace(/^Bearer /, ''));
     assert.ok(claims, 'userinfo must be requested with the access token just issued');
+    userinfoCalls++;
     return Response.json(claims);
   }
   throw new Error('Unexpected external request: ' + url);
@@ -172,5 +174,21 @@ try {
   failDeletion = false;
   await auth('/api/auth/signout', { jar: other.jar, method: 'POST', body: { csrfToken: otherCsrf.csrfToken, callbackUrl: origin } });
   assert.equal(await getAppUser(identityRequest(other.jar)), null);
-  console.log('Google auth checks passed: full mocked OAuth, PKCE/state/nonce, CSRF, verified identity, sessions, revocation, expiry and workspace isolation.');
+  assert.ok(userinfoCalls >= 3, 'profile (photo) is fetched from the userinfo endpoint, not read from the ID token');
+  // Closed studio: a brand-new Google account that was not invited is refused before any row is written.
+  globalThis.authTestEnv.OWNER_EMAIL = 'owner@studio.test';
+  const uninvited = await begin({ sub: 'google-subject-c', email: 'uninvited@example.test' }); const refused = await finish(uninvited);
+  assert.match(refused.headers.get('location') ?? '', /error=AccessDenied/);
+  assert.equal(await getAppUser(identityRequest(uninvited.jar)), null);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM users WHERE email = 'uninvited@example.test'")).rows[0].n, 0);
+  await pg.query("INSERT INTO workspaces (id, name, created_by) VALUES ('ws:host', 'Studio', 'host')");
+  await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role, email) VALUES ('ws:host', 'invite:invited@example.test', 'viewer', 'invited@example.test')");
+  const invitedFlow = await begin({ sub: 'google-subject-d', email: 'invited@example.test' }); await finish(invitedFlow);
+  const invitedUser = await getAppUser(identityRequest(invitedFlow.jar)); assert.equal(invitedUser?.email, 'invited@example.test');
+  const invitedView = await (await records.GET(identityRequest(invitedFlow.jar))).json();
+  assert.equal(invitedView.workspace.id, 'ws:host'); assert.equal(invitedView.workspace.role, 'viewer');
+  const existingFlow = await begin({ sub: 'google-subject-b', email: 'second@example.test' }); await finish(existingFlow);
+  assert.ok(await getAppUser(identityRequest(existingFlow.jar)), 'accounts created earlier keep signing in');
+  delete globalThis.authTestEnv.OWNER_EMAIL;
+  console.log('Google auth checks passed: full mocked OAuth, PKCE/state/nonce, CSRF, verified identity, userinfo profile, sessions, revocation, expiry and workspace isolation.');
 } finally { globalThis.fetch = realFetch; await pg.close(); }

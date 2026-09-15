@@ -33,6 +33,8 @@ On-time publish rate (≥ 95 %), median client validation time (< 24 h, explicit
 
 `owner · admin · creative · viewer` see the studio. A **`client`** member is scoped to one client (`workspace_members.client_id`) and only ever sees the portal: home, à valider, calendrier, livrables, demande and the review page with the countdown. Internal fields (assignee, source, reminders, studio links) are stripped server-side (`portalView`). Clients can approve, request changes, comment and submit requests — nothing else.
 
+**Closed studio**: with `OWNER_EMAIL` set (comma-separated addresses), only those addresses can open a workspace on their own. Any other Google sign-in without a pending invitation is refused before an account is created, and password sign-up requires an invitation code. Unset it for open sign-up (development).
+
 **Invitations**: Équipe → *Inviter une personne* (e-mail + role, plus the client for portal access). The row is stored as `invite:<email>` with an **invitation code** (shown to owners/admins). A Google sign-in claims it automatically (Google proves the e-mail); a password account claims it by entering the code at sign-up or sign-in — a typed e-mail is never trusted on its own. The app sends no e-mail — share the URL and code yourself. Members with several workspaces get a switcher in the sidebar.
 
 The portal follows the client record’s `language`: `العربية` renders right-to-left with Arabic copy ([lib/portal-i18n.ts](lib/portal-i18n.ts)).
@@ -91,7 +93,7 @@ Backups: Supabase Pro takes daily backups; `pg_dump "$DIRECT_URL" > backup.sql` 
 ## Vercel
 
 1. Import the repository; framework preset **Next.js**, build `pnpm build`.
-2. Environment variables (Production): `AUTH_URL=https://<your-domain>`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET` (32+ random chars).
+2. Environment variables (Production): `AUTH_URL=https://<your-domain>`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET` (32+ random chars), `OWNER_EMAIL` (the studio's address).
 3. Add `https://<your-domain>/api/auth/callback/google` to the Google OAuth client and publish the consent screen (only `openid email profile` are requested — no verification review needed).
 4. The cron in [vercel.json](vercel.json) is picked up on deploy.
 

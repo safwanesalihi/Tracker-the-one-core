@@ -89,5 +89,25 @@ await post({ action: 'sign-up', email: 'google@studio.test', password: 'takeover
 await post({ action: 'sign-in', email: 'google@studio.test', password: 'takeover-attempt-1234' }, { status: 401 });
 eq((await pg.query("SELECT password_hash FROM users WHERE id = 'g1'")).rows[0].password_hash, null);
 
+// Closed studio: with OWNER_EMAIL set, only the owner or an invited address gets in.
+globalThis.testEnv.OWNER_EMAIL = 'Contact@The1Core.com';
+await post({ action: 'sign-up', email: 'stranger@example.test', password: 'a-perfectly-fine-password', name: 'Stranger' }, { status: 403 });
+eq((await pg.query("SELECT count(*)::int AS n FROM users WHERE email = 'stranger@example.test'")).rows[0].n, 0, 'no account row for a refused sign-up');
+const studioOwner = await post({ action: 'sign-up', email: 'contact@the1core.com', password: 'the-owner-password-2026', name: 'The One Core' });
+const ownerView = await (await api(studioOwner.cookie)).json();
+eq(ownerView.workspace.role, 'owner', 'the configured address opens its workspace');
+await mutate(studioOwner.cookie, { action: 'invite-member', email: 'dalila@studio.test', role: 'admin' });
+const dalilaCode = (await pg.query("SELECT invite_code FROM workspace_members WHERE user_id = 'invite:dalila@studio.test'")).rows[0].invite_code;
+await post({ action: 'sign-up', email: 'dalila@studio.test', password: 'dalila-long-password-1', name: 'Dalila' }, { status: 403 });
+const dalila = await post({ action: 'sign-up', email: 'dalila@studio.test', password: 'dalila-long-password-1', name: 'Dalila', inviteCode: dalilaCode });
+eq((await (await api(dalila.cookie)).json()).workspace.role, 'admin', 'invited address joins with the code');
+// An account that exists but has no membership (created before the rule) gets a clear refusal and no workspace.
+await pg.query("INSERT INTO users (id, name, email, email_verified) VALUES ('orphan', 'Orphan', 'orphan@example.test', now())");
+await pg.query("INSERT INTO sessions (session_token, user_id, expires) VALUES ($1, 'orphan', now() + interval '1 day')", [(await import('node:crypto')).createHash('sha256').update('orphan-token-orphan-token-orphan').digest('hex')]);
+const orphan = await api('__Host-the-one.session=orphan-token-orphan-token-orphan');
+eq([orphan.status, (await orphan.json()).code], [403, 'no-workspace']);
+eq((await pg.query("SELECT count(*)::int AS n FROM workspaces WHERE created_by = 'orphan'")).rows[0].n, 0, 'no workspace created for the orphan');
+delete globalThis.testEnv.OWNER_EMAIL;
+
 await pg.close();
-console.log(`${checks} password sign-in checks passed: hashing, lockout, invitation codes, Google-account protection and API sessions.`);
+console.log(`${checks} password sign-in checks passed: hashing, lockout, invitation codes, Google-account protection, closed-studio access and API sessions.`);

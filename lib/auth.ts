@@ -6,6 +6,7 @@ import { database } from '@/lib/database';
 import { postgresAuthAdapter } from '@/lib/auth-adapter';
 import { readAuthSettings, readSessionSettings, requestOrigin, safeCallbackUrl } from '@/lib/auth-settings';
 import { googleProfileImage } from '@/lib/profile';
+import { mayJoinByEmail } from '@/lib/access';
 
 export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; image: string | null; verified: boolean };
 export const authSettings = () => readAuthSettings(env);
@@ -36,10 +37,11 @@ export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>
       clientId: settings.clientId, clientSecret: settings.clientSecret,
       checks: ['pkce', 'state', 'nonce'],
       authorization: { params: { scope: 'openid email profile', prompt: 'select_account' } },
+      allowDangerousEmailAccountLinking: false,
       // Google Workspace accounts often omit `picture` from the ID token; the userinfo endpoint always
       // returns the current photo. The ID token is still validated (nonce, audience, expiry).
-      idToken: false,
-      allowDangerousEmailAccountLinking: false,
+      // Provider-level option, merged at runtime; not part of the user-config type.
+      ...({ idToken: false } as Record<string, unknown>),
     })],
     pages: { signIn: '/login', error: '/login' },
     callbacks: {
@@ -48,8 +50,9 @@ export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>
         // Refresh the photo only for this verified, already-linked Google identity.
         const adapter = authAdapter();
         const existing = await adapter.getUserByAccount!({ provider: 'google', providerAccountId: account.providerAccountId });
-        if (existing) await adapter.updateUser!({ id: existing.id, image: googleProfileImage(profile.picture) });
-        return true;
+        if (existing) { await adapter.updateUser!({ id: existing.id, image: googleProfileImage(profile.picture) }); return true; }
+        // New account: in a closed studio only the owner or an invited address may come in.
+        return mayJoinByEmail(database(), profile.email);
       },
       redirect({ url }) { return safeCallbackUrl(url, settings.origin); },
       session({ session, user }) {

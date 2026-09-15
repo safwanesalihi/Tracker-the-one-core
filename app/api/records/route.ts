@@ -12,10 +12,12 @@ import {
 } from '@/lib/flow';
 import { applySweep, insertRecord, loadRecords } from '@/lib/flow-server';
 import { newInviteCode } from '@/lib/password-auth';
+import { closedStudio, isOwnerEmail } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
 class WorkspaceAccessError extends Error {}
+class NoWorkspaceError extends Error {}
 
 const response = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -89,6 +91,7 @@ async function workspaceFor(user: AppUser, requestedId?: string | null): Promise
   if ((membership && !isWorkspaceRole(membership.role)) || (!membership && requestedId)) {
     throw new WorkspaceAccessError();
   }
+  if (!membership && closedStudio() && !isOwnerEmail(user.email)) throw new NoWorkspaceError();
   const workspace: WorkspaceContext = membership
     ? { id: membership.id, name: membership.name, role: membership.role as WorkspaceContext['role'], clientId: membership.clientId }
     : await ensureWorkspace(user.userId, user.fullName || user.displayName);
@@ -155,6 +158,7 @@ export async function GET(req?: Request) {
     }
     return response(await payload(workspace, user, rows));
   } catch (error) {
+    if (error instanceof NoWorkspaceError) return response({ error: 'Aucun espace ne vous est attribué. Demandez une invitation au studio.', code: 'no-workspace' }, 403);
     if (error instanceof WorkspaceAccessError) return response({ error: 'Vous n’avez plus accès à cet espace.' }, 403);
     console.error('load records', error);
     return response({ error: 'Impossible de charger votre espace. Réessayez.' }, 503);
@@ -544,6 +548,7 @@ export async function POST(req: Request) {
     }
     return result({ id: item.id });
   } catch (error) {
+    if (error instanceof NoWorkspaceError) return response({ error: 'Aucun espace ne vous est attribué. Demandez une invitation au studio.', code: 'no-workspace' }, 403);
     if (error instanceof WorkspaceAccessError) return response({ error: 'Vous n’avez plus accès à cet espace.' }, 403);
     console.error('save record', error);
     return response({ error: 'Enregistrement impossible. Vos saisies sont conservées ; réessayez.' }, 503);
