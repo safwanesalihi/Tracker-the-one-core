@@ -2,8 +2,10 @@
 // The client portal: four read-only screens, a request form and the review page.
 // Rendered for a signed-in client contact (mode "client") and for the studio's own preview (mode "preview").
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Folder, Home, Inbox, Loader2, LogOut, Send, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Home, Inbox, List, Loader2, LogOut, Send, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DatePicker from '@/app/date-picker';
 import { Sidebar, SidebarProvider, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Avatar from '@/app/profile-avatar';
@@ -52,6 +54,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
   const [request, setRequest] = useState({ name: '', projectId: '', due: '', channel: '', description: '' });
   const [formError, setFormError] = useState('');
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [projectFilter, setProjectFilter] = useState('');
 
   const projects = records.filter((r) => r.kind === 'project' && r.clientId === client.id && !r.archived);
   const tasks = records.filter((r) => r.kind === 'task' && r.clientId === client.id && !r.archived && (!r.projectId || projects.some((p) => p.id === r.projectId)));
@@ -165,21 +168,18 @@ export default function Portal({ mode, records, client, user, route, today, busy
     </>;
   }
 
-  function ProjectsScreen() {
-    const byProject = projects.map((p) => ({ project: p, items: tasks.filter((t) => t.projectId === p.id).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')) }));
+  function TasksScreen() {
+    const items = tasks.filter((t) => !projectFilter || t.projectId === projectFilter).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
     return <>
-      <div className="page-heading"><h1>{copy.projects}</h1><p>{client.name}</p></div>
-      {byProject.map(({ project, items }) => <section className="portal-project" key={project.id}>
-        <div className="section-head"><div><h2><Folder size={16} /> {project.name}<span className="neutral-badge">{copy.tasksCount(items.length)}</span></h2>{project.description && <p>{project.description}</p>}</div></div>
-        {items.length ? <div className="table-area"><Table className="portal-table"><TableHeader><TableRow><TableHead>{copy.colTask}</TableHead><TableHead>{copy.colStatus}</TableHead><TableHead>{copy.colDate}</TableHead><TableHead>{copy.colFile}</TableHead></TableRow></TableHeader>
-          <TableBody>{items.map((t) => { const url = (t.status === 'À valider' || t.status === 'Validé') ? link(t) : ''; return <TableRow key={t.id} className="portal-row" onClick={() => navigate({ page: 'review', id: t.id })}>
-            <TableCell><strong>{t.name}</strong>{t.channel && <small> · {t.channel}</small>}</TableCell>
-            <TableCell><Chip status={t.status} copy={copy} /></TableCell>
-            <TableCell>{t.publishedAt ? `${copy.published} · ${fmt(t.publishedAt)}` : t.due ? fmt(t.due) : copy.noDate}</TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>{url ? <a className="file-pill" href={url} target="_blank" rel="noopener noreferrer"><FileText size={13} />{copy.open}<ArrowUpRight size={12} /></a> : '—'}</TableCell>
-          </TableRow>; })}</TableBody></Table></div> : <p className="small-note">{copy.noTasks}</p>}
-      </section>)}
-      {!byProject.length && <div className="portal-empty"><Folder size={28} /><h2>{copy.noProjects}</h2></div>}
+      <div className="page-heading"><div className="heading-line"><h1>{copy.tasks}</h1>{projects.length > 1 && <Select value={projectFilter || '__all'} onValueChange={(v) => setProjectFilter(v === '__all' ? '' : v)}><SelectTrigger className="pick" aria-label={copy.colProject}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__all">{copy.allProjects}</SelectItem>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>}</div><p>{client.name} · {copy.tasksCount(items.length)}</p></div>
+      {items.length ? <div className="database-card"><div className="table-area"><Table className="portal-table"><TableHeader><TableRow><TableHead>{copy.colTask}</TableHead><TableHead>{copy.colProject}</TableHead><TableHead>{copy.colStatus}</TableHead><TableHead>{copy.colDate}</TableHead><TableHead>{copy.colFile}</TableHead></TableRow></TableHeader>
+        <TableBody>{items.map((t) => { const url = (t.status === 'À valider' || t.status === 'Validé') ? link(t) : ''; return <TableRow key={t.id} className="portal-row" onClick={() => navigate({ page: 'review', id: t.id })}>
+          <TableCell><strong>{t.name}</strong>{t.channel && <small> · {t.channel}</small>}</TableCell>
+          <TableCell>{pname(t.projectId)}</TableCell>
+          <TableCell><Chip status={t.status} copy={copy} /></TableCell>
+          <TableCell>{t.publishedAt ? `${copy.published} · ${fmt(t.publishedAt)}` : t.due ? fmt(t.due) : copy.noDate}</TableCell>
+          <TableCell onClick={(e) => e.stopPropagation()}>{url ? <a className="file-pill" href={url} target="_blank" rel="noopener noreferrer"><FileText size={13} />{copy.open}<ArrowUpRight size={12} /></a> : '—'}</TableCell>
+        </TableRow>; })}</TableBody></Table></div></div> : <div className="portal-empty"><List size={28} /><h2>{copy.noTasks}</h2></div>}
     </>;
   }
 
@@ -190,10 +190,10 @@ export default function Portal({ mode, records, client, user, route, today, busy
         <form onSubmit={sendRequest} className="form-fields">
           <label className="form-field"><span>{copy.requestName} *</span><input required maxLength={160} value={request.name} onChange={(e) => setRequest({ ...request, name: e.target.value })} /></label>
           <div className="form-pair">
-            <label className="form-field"><span>{copy.requestProject}</span><select value={request.projectId} onChange={(e) => setRequest({ ...request, projectId: e.target.value })}><option value="">—</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <label className="form-field"><span>{copy.requestDate}</span><input type="date" min={today} value={request.due} onChange={(e) => setRequest({ ...request, due: e.target.value })} /></label>
+            <label className="form-field"><span>{copy.requestProject}</span><Select value={request.projectId || '__none'} onValueChange={(v) => setRequest({ ...request, projectId: v === '__none' ? '' : v })}><SelectTrigger className="pick" aria-label={copy.requestProject}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{copy.choose}</SelectItem>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></label>
+            <label className="form-field"><span>{copy.requestDate}</span><DatePicker label={copy.requestDate} value={request.due} onChange={(value) => setRequest({ ...request, due: value })} placeholder={copy.choose} /></label>
           </div>
-          <label className="form-field"><span>{copy.requestChannel}</span><select value={request.channel} onChange={(e) => setRequest({ ...request, channel: e.target.value })}><option value="">—</option>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+          <label className="form-field"><span>{copy.requestChannel}</span><Select value={request.channel || '__none'} onValueChange={(v) => setRequest({ ...request, channel: v === '__none' ? '' : v })}><SelectTrigger className="pick" aria-label={copy.requestChannel}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{copy.choose}</SelectItem>{channels.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></label>
           <label className="form-field"><span>{copy.requestDescription}</span><textarea rows={5} maxLength={15000} value={request.description} onChange={(e) => setRequest({ ...request, description: e.target.value })} /></label>
           <small className="small-note">{copy.requestLockNote(flow.lockDays)}</small>
           {formError && <p className="form-error" role="alert">{formError}</p>}
@@ -230,7 +230,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
     </>;
   }
 
-  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'projects' ? copy.projects : tab === 'request' ? copy.request : copy.review;
+  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'tasks' ? copy.tasks : tab === 'request' ? copy.request : copy.review;
 
   return <div dir={copy.dir} lang={rtl ? 'ar' : 'fr'} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
     <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
@@ -239,7 +239,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         <SidebarContent><SidebarGroup><SidebarGroupLabel>{copy.space.toUpperCase()}</SidebarGroupLabel><SidebarMenu>
           <NavItem icon={Home} label={copy.home} active={tab === 'home'} onClick={() => go('home')} />
           <NavItem icon={CheckCircle2} label={copy.review} active={tab === 'review'} badge={waiting.length} onClick={() => go('review')} />
-          <NavItem icon={Folder} label={copy.projects} active={tab === 'projects'} onClick={() => go('projects')} />
+          <NavItem icon={List} label={copy.tasks} active={tab === 'tasks'} onClick={() => go('tasks')} />
           <NavItem icon={CalendarDays} label={copy.calendar} active={tab === 'calendar'} onClick={() => go('calendar')} />
           <NavItem icon={FileText} label={copy.files} active={tab === 'files'} onClick={() => go('files')} />
           <NavItem icon={Inbox} label={copy.request} active={tab === 'request'} onClick={() => go('request')} />
@@ -254,7 +254,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         {mode === 'preview' && <div className="preview-banner"><Eye size={16} /><span>{copy.previewBanner}</span><button className="text-link" onClick={onLeave}>{copy.leave}<ArrowUpRight size={14} /></button></div>}
         <div className="page-content">
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="btn" onClick={() => onError('')}>OK</button></div>}
-          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'projects' ? ProjectsScreen() : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
+          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'tasks' ? TasksScreen() : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
         </div>
       </main>
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} />{notice}</div>}
