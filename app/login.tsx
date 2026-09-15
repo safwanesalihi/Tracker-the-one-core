@@ -8,6 +8,8 @@ type Step = 'sign-in' | 'change-password';
 
 export default function Login({ initialStep = 'sign-in', email: knownEmail = '' }: { initialStep?: Step; email?: string }) {
   const [step, setStep] = useState<Step>(initialStep);
+  // Only asked when the temporary password was not typed on this very screen (gate reached after a reload).
+  const [askCurrent] = useState(initialStep === 'change-password');
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +32,12 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
     return data;
   }
 
+  // The form lives both at "/" (inside the tracker) and at "/login": land on the studio home either way.
+  function enter() {
+    if (window.location.pathname === '/') { window.location.hash = '#home'; window.location.reload(); }
+    else window.location.replace('/#home');
+  }
+
   async function submitSignIn(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -37,8 +45,7 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
     try {
       const data = await call({ action: 'sign-in', email: form.email, password: form.password });
       if (data.mustChangePassword) { setStep('change-password'); setBusy(false); return; }
-      window.location.hash = '#home';
-      window.location.reload();
+      enter();
     } catch (error) { setError((error as Error).message); setBusy(false); }
   }
 
@@ -49,8 +56,7 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
     setBusy(true); setError('');
     try {
       await call({ action: 'change-password', currentPassword: form.password, newPassword: form.newPassword });
-      window.location.hash = '#home';
-      window.location.reload();
+      enter();
     } catch (error) { setError((error as Error).message); setBusy(false); }
   }
 
@@ -72,7 +78,7 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
         <h1>Choisissez votre mot de passe<span className="wordmark-dot">.</span></h1>
         <p>{form.email ? `Bienvenue, ${form.email}. ` : ''}Le mot de passe temporaire ne sert qu’une fois : choisissez maintenant le vôtre (10 caractères minimum).</p>
         <form className="auth-password" onSubmit={submitChange} aria-label="Choisir un mot de passe">
-          {!form.password && <label><span>Mot de passe actuel</span><input type="password" required maxLength={200} autoComplete="current-password" value={form.password} onChange={set('password')} /></label>}
+          {askCurrent && <label><span>Mot de passe actuel</span><input type="password" required maxLength={200} autoComplete="current-password" value={form.password} onChange={set('password')} /></label>}
           <label><span>Nouveau mot de passe</span><input type="password" required minLength={10} maxLength={200} autoComplete="new-password" value={form.newPassword} onChange={set('newPassword')} placeholder="10 caractères minimum" /></label>
           <label><span>Confirmez le mot de passe</span><input type="password" required minLength={10} maxLength={200} autoComplete="new-password" value={form.confirm} onChange={set('confirm')} /></label>
           <button className="btn primary auth-submit" disabled={busy}>

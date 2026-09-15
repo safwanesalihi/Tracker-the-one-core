@@ -32,7 +32,7 @@ assert.doesNotMatch(render({ ...base, members: members.map((m) => ({ ...m, name:
 assert.match(owner, /Modifier le rôle de Nina/);
 assert.match(owner, /Retirer Jules de l’espace/);
 assert.doesNotMatch(owner, /Modifier le rôle de Ava|Retirer Ava de l’espace/);
-assert.match(owner, /Membre sans profil/);
+assert.match(owner, /Membre de l’équipe/);
 assert.match(owner, /ava@example.test/);
 assert.doesNotMatch(owner, /86%|En ligne|Hors ligne|Yasmine|safwane@theone/);
 const admin = render({ ...base, currentUserId: 'b', workspace: { ...base.workspace, role: 'admin' } });

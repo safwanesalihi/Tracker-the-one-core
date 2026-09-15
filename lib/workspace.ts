@@ -41,4 +41,4 @@ export const isWorkspaceRole = (value: unknown): value is WorkspaceRole =>
   typeof value === 'string' && workspaceRoles.some((role) => role === value);
 export const canManageMembers = (role: WorkspaceRole) => role === 'owner' || role === 'admin';
 export const isStudioRole = (role: WorkspaceRole) => role !== 'client';
-export const memberName = (member: WorkspaceMember) => member.name || member.email || 'Membre sans profil';
+export const memberName = (member: WorkspaceMember) => member.name || member.email || 'Membre de l’équipe';

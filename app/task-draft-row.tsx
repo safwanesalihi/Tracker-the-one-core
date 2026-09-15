@@ -34,13 +34,13 @@ export default function TaskDraftRow({ draft, clients, projects, members = [], b
     </Select>;
   return <TableRow className="task-draft-row" aria-label="Nouvelle tâche à remplir">
       <TableCell><input ref={nameInput} form={formId} required maxLength={160} aria-label="Nom de la nouvelle tâche" placeholder="Nom de la tâche…" value={draft.name} disabled={busy} onChange={e => set('name', e.target.value)} /></TableCell>
+      <TableCell>{pick('status', 'Statut de la nouvelle tâche', statuses.map(s => ({ value: s, label: s })))}</TableCell>
       <TableCell>{pick('clientId', 'Choisir un client', activeClients.map(c => ({ value: c.id, label: c.name })))}</TableCell>
       <TableCell>{pick('projectId', 'Choisir un sous-projet', activeProjects.map(p => ({ value: p.id, label: p.name })), !draft.clientId)}</TableCell>
       <TableCell>{pick('assignee', 'Non assigné', members.map(member => ({ value: memberName(member), label: memberName(member) })))}</TableCell>
       <TableCell><DatePicker label="Échéance de la nouvelle tâche" value={draft.due} onChange={value => set('due', value)} /></TableCell>
-      <TableCell><input form={formId} type="url" maxLength={2000} aria-label="Source de la nouvelle tâche" placeholder="https://…" value={draft.source} disabled={busy} onChange={e => set('source', e.target.value)} /></TableCell>
       <TableCell><input form={formId} type="url" maxLength={2000} aria-label="Livrable de la nouvelle tâche" placeholder="https://…" value={draft.deliverable} disabled={busy} onChange={e => set('deliverable', e.target.value)} /></TableCell>
-      <TableCell>{pick('status', 'Statut de la nouvelle tâche', statuses.map(s => ({ value: s, label: s })))}</TableCell>
+      <TableCell><input form={formId} type="url" maxLength={2000} aria-label="Source de la nouvelle tâche" placeholder="https://…" value={draft.source} disabled={busy} onChange={e => set('source', e.target.value)} /></TableCell>
     </TableRow>;
 }
 

@@ -48,6 +48,12 @@ export default function Portal({ mode, records, client, user, route, today, busy
   const rtl = copy.dir === 'rtl';
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+  // Drawers, dialogs and dropdowns are portaled outside .portal-root: direction and language live on <html> while the portal is shown.
+  useEffect(() => {
+    const root = document.documentElement; const prev = { dir: root.getAttribute('dir'), lang: root.getAttribute('lang') };
+    root.setAttribute('dir', copy.dir); root.setAttribute('lang', rtl ? 'ar' : 'fr');
+    return () => { prev.dir ? root.setAttribute('dir', prev.dir) : root.removeAttribute('dir'); prev.lang ? root.setAttribute('lang', prev.lang) : root.removeAttribute('lang'); };
+  }, [copy.dir, rtl]);
   const [dialog, setDialog] = useState<'approve' | 'changes' | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [text, setText] = useState('');
@@ -70,7 +76,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
   const tab = route.page === 'review' ? 'review' : route.tab || 'home';
   const pname = (id?: string) => projects.find((p) => p.id === id)?.name || '';
   const fmt = (iso?: string, withTime = false) => iso ? new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString(copy.locale, withTime ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' }) : copy.noDate;
-  function link(t: RecordItem) { return t.demo && t.deliverable === '/demo-deliverable.html' ? '/demo-deliverable.html' : safeLink(t.deliverable || ''); }
+  function link(t: RecordItem) { return t.deliverable === '/demo-deliverable.html' ? '/demo-deliverable.html' : safeLink(t.deliverable || ''); }
   const go = (tab: string) => navigate({ page: 'portal', id: client.id, tab });
 
   async function decide(kind: 'approve' | 'changes') {

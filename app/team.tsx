@@ -105,7 +105,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <a className="btn primary" href="/login" target="_top">Se connecter</a>
     </Empty> : <>
       <div className="team-summary">
-        {([['MEMBRES', members.length], ['GESTION DES ACCÈS', managers], ['LECTURE SEULE', viewers], ['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length], ['EN ATTENTE', members.filter((m) => m.pending).length]] as const).map(([label, value]) =>
+        {([['MEMBRES', members.length], ['GESTION DES ACCÈS', managers], ...(viewers ? [['LECTURE SEULE', viewers] as const] : []), ['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length], ['EN ATTENTE', members.filter((m) => m.pending).length]] as const).map(([label, value]) =>
           <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </div>
       {allowed && <section className="team-card team-invite" aria-labelledby="team-invite-title">
@@ -150,7 +150,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
             return <TableRow key={member.userId}>
               <TableCell><div className="team-person"><Avatar name={name} /><div className="member-identity">
                 <strong>{name} {own && <span className="neutral-badge">Vous</span>}{member.pending && <span className="neutral-badge"><Mail size={10} /> En attente de première connexion</span>}</strong>
-                <small>{member.role === 'client' ? `Portail · ${clientName(member.clientId)}` : member.email || 'Membre'}{allowed && member.lastLoginAt ? ` · dernière connexion ${when(member.lastLoginAt)}` : ''}</small>
+                <small>{member.role === 'client' ? `Portail · ${clientName(member.clientId)}` : member.email || roleLabels[member.role]}{allowed && member.lastLoginAt ? ` · dernière connexion ${when(member.lastLoginAt)}` : ''}</small>
               </div></div></TableCell>
               <TableCell><span className="team-role-label">{roleLabels[member.role]}</span></TableCell>
               <TableCell className="team-date"><time dateTime={member.createdAt}>{new Date(member.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</time></TableCell>

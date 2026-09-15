@@ -16,8 +16,8 @@
 .draft-actions { display: flex; gap: 8px; }
 .draft-actions .btn { font-size: 14px; }
 .task-table:has(.task-draft-row) { min-width: 1280px; }
-.task-table:has(.task-draft-row) th:nth-child(5) { width: 13%; }
-.task-table:has(.task-draft-row) th:nth-child(8) { width: 13%; }
+.task-table:has(.task-draft-row) th:nth-child(2) { width: 13%; }
+.task-table:has(.task-draft-row) th:nth-child(6) { width: 13%; }
 @media (max-width: 767px) {
   .task-draft-row input, .task-draft-row .draft-pick { font-size: 16px; }
   .task-draft-footer form { justify-content: flex-start; }
