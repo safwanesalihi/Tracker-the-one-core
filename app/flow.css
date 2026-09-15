@@ -1,5 +1,9 @@
 /* The One Flow — court chips, gates, receipts, alerts, pilotage, portal, annex. */
 
+/* Shown only while the very first auth check is in flight, before we know whether to render the studio shell or the login screen. */
+.boot-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1c1e23}
+.boot-screen .auth-logo{margin:0;opacity:.92}
+
 /* Court chip: who has to act. Studio = black dot, Client = gold dot, Terminé = check. Never typed, always derived. */
 .court{display:inline-flex;align-items:center;gap:6px;min-height:22px;padding:1px 8px 1px 6px;border:1px solid #EDECEA;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap;background:#fff}
 .court i{width:8px;height:8px;border-radius:50%;background:#111;display:inline-block}

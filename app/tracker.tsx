@@ -3146,6 +3146,16 @@ export default function Tracker() {
               : route.page === "annex"
                 ? tr("Annexe contractuelle")
                 : client?.name || task?.name || tr("Espace");
+  // Before the first /api/records reply comes back, we don't yet know whether the visitor is
+  // signed in — auth defaults to false, so without this the studio shell would flash on screen
+  // for everyone, logged in or not, right before swapping to the login screen.
+  if (loading && !workspace && !auth && !noAccess && !changePassword) {
+    return (
+      <div className="boot-screen">
+        <img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" />
+      </div>
+    );
+  }
   if (auth) return <Login />;
   if (changePassword) return <Login initialStep="change-password" />;
   if (noAccess)
