@@ -65,7 +65,7 @@ const y = await get();
 eq(y.workspace.role, 'creative');
 eq(ids(y, 'client'), [c1.id, c2.id].sort(), 'all clients visible');
 eq(ids(y, 'project'), [p1.id, p2.id].sort(), 'all projects visible');
-eq(ids(y, 'task'), [ty1.id, ty2.id].sort(), 'only tasks assigned to Yasmine');
+eq(ids(y, 'task'), [ty1.id, ty2.id, tu.id].sort(), 'tasks assigned to Yasmine plus the unassigned one');
 eq(ids(y, 'comment'), [], 'no comments from other people’s tasks');
 ok(y.members.every((m) => m.email === null || m.userId === yasmine.userId) && !y.members.some((m) => m.inviteCode), 'roster without e-mails or codes');
 ok(!y.members.some((m) => m.userId.startsWith('invite:')), 'pending invitations hidden');
@@ -73,13 +73,15 @@ ok(!y.members.some((m) => m.userId.startsWith('invite:')), 'pending invitations 
 // A member may only act on their own tasks, and always for themselves.
 await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { name: 'Affiche Amine', clientId: c1.id, projectId: p1.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } }, 404);
 await post({ action: 'comment', taskId: ta1.id, text: 'intrusion' }, 404);
-await post({ action: 'comment', taskId: tu.id, text: 'unassigned' }, 404);
-await post({ action: 'update', kind: 'task', id: ty2.id, revision: 1, data: { name: 'Post Yasmine', clientId: c2.id, projectId: p2.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } }, 403);
-const mine = await post({ action: 'create', kind: 'task', data: { name: 'Story créée par Yasmine', clientId: c1.id, projectId: p1.id, status: 'À faire', due: '2026-12-05' } });
-eq(mine.records.find((r) => r.id === mine.id).assignee, 'Yasmine Creative', 'a member’s new task is assigned to them');
-await post({ action: 'create', kind: 'task', data: { name: 'Pour Amine', clientId: c1.id, projectId: p1.id, assignee: 'Amine Creative', status: 'À faire', due: '2026-12-05' } }, 403);
-await post({ action: 'create', kind: 'project', data: { name: 'Projet pirate', clientId: c1.id } }, 403);
-await post({ action: 'create', kind: 'client', data: { name: 'Client pirate' } }, 403);
+await post({ action: 'comment', taskId: tu.id, text: 'je prends' });
+const handed = await post({ action: 'update', kind: 'task', id: ty2.id, revision: 1, data: { name: 'Post Yasmine', clientId: c2.id, projectId: p2.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } });
+ok(!handed.records.some((r) => r.id === ty2.id), 'handing a task to a teammate moves it out of my view');
+const mine = await post({ action: 'create', kind: 'task', data: { name: 'Story créée par Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'À faire', due: '2026-12-05' } });
+ok(mine.records.some((r) => r.id === mine.id), 'members create tasks');
+const newClient = await post({ action: 'create', kind: 'client', data: { name: 'Client créé par un membre', quota: '4' } });
+const newProject = await post({ action: 'create', kind: 'project', data: { name: 'Sous-projet créé par un membre', clientId: newClient.id } });
+ok(newProject.records.some((r) => r.id === newProject.id), 'members create clients and sub-projects');
+await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client créé par un membre', archived: true } }, 403);
 await post({ action: 'invite-member', email: 'z@z.test', role: 'creative' }, 403);
 await post({ action: 'demo' }, 403);
 await post({ action: 'request', clientId: c1.id, data: { name: 'Demande' } }, 403);
@@ -90,8 +92,8 @@ await post({ action: 'comment', taskId: ty1.id, text: 'Envoyé !' });
 // Amine sees the mirror image.
 as(amine);
 const a = await get();
-eq(ids(a, 'task'), [ta1.id], 'only Amine’s task');
-eq(a.records.filter((r) => r.kind === 'comment').length, 1, 'the owner’s comment on Amine’s task is visible to Amine');
+eq(ids(a, 'task'), [ta1.id, ty2.id, tu.id].sort(), 'Amine’s task, the one Yasmine handed over, and the unassigned one');
+eq(a.records.filter((r) => r.kind === 'comment').length, 2, 'comments on Amine’s task and on the unassigned task are visible to Amine; Yasmine’s own-task comment is not');
 
 // The client sees their portal only: their client, projects and tasks — nobody else’s.
 as(contact);
@@ -100,6 +102,7 @@ eq(c.workspace.role, 'client');
 eq(ids(c, 'client'), [c1.id]);
 eq(ids(c, 'project'), [p1.id]);
 eq(ids(c, 'task'), [ty1.id, ta1.id, tu.id, mine.id].sort(), 'all of Client Un’s tasks, none of Client Deux’s');
+ok(!c.records.some((r) => r.id === newClient.id), 'other clients invisible');
 ok(c.records.filter((r) => r.kind === 'task').every((r) => !('assignee' in r)), 'assignees hidden from the client');
 eq(c.members, []);
 await post({ action: 'approve', taskId: ty1.id });
@@ -107,5 +110,6 @@ await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { na
 
 as(owner);
 eq(ids(await get(), 'task').length, 5, 'the owner sees everything');
+eq(ids(await get(), 'client').length, 3, 'including the member-created client');
 await pg.close();
 console.log(`${checks} role checks passed: single owner, member scope (clients + own tasks), client portal scope.`);

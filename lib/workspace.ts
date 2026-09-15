@@ -27,7 +27,7 @@ export const roleLabels: Record<WorkspaceRole, string> = {
 export const roleDescriptions: Record<WorkspaceRole, string> = {
   owner: 'Unique. Tout l’espace, le pilotage et la gestion des membres.',
   admin: 'Comme le propriétaire, sauf le rôle lui-même : clients, projets, tâches, archivage, verrou J−7, pilotage, invitations.',
-  creative: 'Voit les clients et uniquement les tâches qui lui sont assignées. Fait avancer ses tâches et commente. Ni pilotage, ni équipe, ni archivage.',
+  creative: 'Clients, sous-projets et tâches. Voit les tâches qui lui sont assignées et celles à prendre. Pilotage sur son périmètre. Ni équipe, ni archivage.',
   viewer: 'Lecture seule de tout l’espace, sans modification ni commentaire.',
   client: 'Portail client uniquement : ses livrables, validation, retours, demandes et calendrier. Rien d’autre.',
 };

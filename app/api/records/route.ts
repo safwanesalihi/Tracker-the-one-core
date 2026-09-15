@@ -131,8 +131,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 const identitiesOf = (user: AppUser) => [user.fullName ?? '', user.displayName, user.email];
+// A member's reach: tasks assigned to them, or not assigned to anyone yet.
 const isMine = (user: AppUser, task: RecordItem) =>
-  !!task.assignee && identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase());
+  !task.assignee?.trim() || identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase());
 
 function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
   if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
@@ -439,30 +440,18 @@ export async function POST(req: Request) {
       return response({ error: 'Action invalide.' }, 400);
     }
     if (!canWrite(workspace.role)) return response({ error: 'Votre rôle est en lecture seule.' }, 403);
-    if (workspace.role === 'creative' && body.kind === 'client') {
-      return response({ error: 'Votre rôle ne peut pas gérer les clients.' }, 403);
-    }
     const rows = rowsNow;
     const existing =
       body.action === 'update'
         ? rows.find((record) => record.id === body.id && record.kind === body.kind)
         : undefined;
     if (body.action === 'update' && !existing) return response({ error: 'Élément introuvable.' }, 404);
-    if (workspace.role === 'creative') {
-      if (body.kind === 'project') return response({ error: 'Les sous-projets sont gérés par les administrateurs.' }, 403);
-      if (existing && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
-    }
+    // A member edits only the tasks within their reach; clients and sub-projects are shared work.
+    if (workspace.role === 'creative' && existing?.kind === 'task' && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
 
     const parsed = fields.safeParse(body.data);
     if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
     const data = parsed.data;
-    if (workspace.role === 'creative' && body.kind === 'task') {
-      // A member's tasks are their own: created for themselves, never handed to someone else.
-      if (!data.assignee) data.assignee = user.fullName || user.displayName;
-      else if (!identitiesOf(user).some((v) => v.trim().toLowerCase() === data.assignee!.trim().toLowerCase())) {
-        return response({ error: 'Vous ne pouvez assigner une tâche qu’à vous-même.' }, 403);
-      }
-    }
     if (body.kind === 'task' && data.assignee) {
       const availableMembers = await members(workspace.id);
       const allowedAssignees = new Set(

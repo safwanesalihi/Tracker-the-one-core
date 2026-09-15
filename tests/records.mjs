@@ -47,7 +47,7 @@ assert.equal(memberView.workspace.role,'creative');
 assert.equal(memberView.user.id,'member-a');
 assert.equal(memberView.members.find(m=>m.userId==='member-a').email,'test@example.com');
 assert.ok(memberView.records.some(r=>r.id===t.id));
-await post({action:'create',kind:'client',data:{name:'Creative cannot create client'}},403);
+await post({action:'create',kind:'client',data:{name:'Client created by a creative member'}});
 await post({action:'set-member-role',userId:'owner-a',role:'viewer',expectedRole:'owner'},403);
 await post({action:'remove-member',userId:'owner-a',expectedRole:'owner'},403);
 await post({action:'create',kind:'project',data:{name:'Archived create',clientId:c.id,archived:true}},403);
