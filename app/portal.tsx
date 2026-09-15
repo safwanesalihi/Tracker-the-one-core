@@ -2,7 +2,8 @@
 // The client portal: four read-only screens, a request form and the review page.
 // Rendered for a signed-in client contact (mode "client") and for the studio's own preview (mode "preview").
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Home, Inbox, Loader2, LogOut, Send, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Folder, Home, Inbox, Loader2, LogOut, Send, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sidebar, SidebarProvider, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Avatar from '@/app/profile-avatar';
@@ -164,6 +165,24 @@ export default function Portal({ mode, records, client, user, route, today, busy
     </>;
   }
 
+  function ProjectsScreen() {
+    const byProject = projects.map((p) => ({ project: p, items: tasks.filter((t) => t.projectId === p.id).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')) }));
+    return <>
+      <div className="page-heading"><h1>{copy.projects}</h1><p>{client.name}</p></div>
+      {byProject.map(({ project, items }) => <section className="portal-project" key={project.id}>
+        <div className="section-head"><div><h2><Folder size={16} /> {project.name}<span className="neutral-badge">{copy.tasksCount(items.length)}</span></h2>{project.description && <p>{project.description}</p>}</div></div>
+        {items.length ? <div className="table-area"><Table className="portal-table"><TableHeader><TableRow><TableHead>{copy.colTask}</TableHead><TableHead>{copy.colStatus}</TableHead><TableHead>{copy.colDate}</TableHead><TableHead>{copy.colFile}</TableHead></TableRow></TableHeader>
+          <TableBody>{items.map((t) => { const url = (t.status === 'À valider' || t.status === 'Validé') ? link(t) : ''; return <TableRow key={t.id} className="portal-row" onClick={() => navigate({ page: 'review', id: t.id })}>
+            <TableCell><strong>{t.name}</strong>{t.channel && <small> · {t.channel}</small>}</TableCell>
+            <TableCell><Chip status={t.status} copy={copy} /></TableCell>
+            <TableCell>{t.publishedAt ? `${copy.published} · ${fmt(t.publishedAt)}` : t.due ? fmt(t.due) : copy.noDate}</TableCell>
+            <TableCell onClick={(e) => e.stopPropagation()}>{url ? <a className="file-pill" href={url} target="_blank" rel="noopener noreferrer"><FileText size={13} />{copy.open}<ArrowUpRight size={12} /></a> : '—'}</TableCell>
+          </TableRow>; })}</TableBody></Table></div> : <p className="small-note">{copy.noTasks}</p>}
+      </section>)}
+      {!byProject.length && <div className="portal-empty"><Folder size={28} /><h2>{copy.noProjects}</h2></div>}
+    </>;
+  }
+
   function RequestScreen() {
     return <>
       <div className="page-heading"><h1>{copy.requestTitle}</h1><p>{copy.requestText}</p></div>
@@ -211,7 +230,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
     </>;
   }
 
-  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'request' ? copy.request : copy.review;
+  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'projects' ? copy.projects : tab === 'request' ? copy.request : copy.review;
 
   return <div dir={copy.dir} lang={rtl ? 'ar' : 'fr'} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
     <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
@@ -220,6 +239,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         <SidebarContent><SidebarGroup><SidebarGroupLabel>{copy.space.toUpperCase()}</SidebarGroupLabel><SidebarMenu>
           <NavItem icon={Home} label={copy.home} active={tab === 'home'} onClick={() => go('home')} />
           <NavItem icon={CheckCircle2} label={copy.review} active={tab === 'review'} badge={waiting.length} onClick={() => go('review')} />
+          <NavItem icon={Folder} label={copy.projects} active={tab === 'projects'} onClick={() => go('projects')} />
           <NavItem icon={CalendarDays} label={copy.calendar} active={tab === 'calendar'} onClick={() => go('calendar')} />
           <NavItem icon={FileText} label={copy.files} active={tab === 'files'} onClick={() => go('files')} />
           <NavItem icon={Inbox} label={copy.request} active={tab === 'request'} onClick={() => go('request')} />
@@ -234,7 +254,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         {mode === 'preview' && <div className="preview-banner"><Eye size={16} /><span>{copy.previewBanner}</span><button className="text-link" onClick={onLeave}>{copy.leave}<ArrowUpRight size={14} /></button></div>}
         <div className="page-content">
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="btn" onClick={() => onError('')}>OK</button></div>}
-          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
+          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'projects' ? ProjectsScreen() : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
         </div>
       </main>
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} />{notice}</div>}

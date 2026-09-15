@@ -226,3 +226,16 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .btn.primary.danger{background:#aa3d36;border-color:#8f302b;color:#fff}
 .btn.primary.danger:hover{background:#8f302b}
 .task-table td:last-child .inline{flex-wrap:nowrap}
+
+/* Portal: tasks per project */
+.portal-project{margin-bottom:26px;background:#fff;border:1px solid #e4e8ee;border-radius:11px;padding:18px 20px 8px}
+.portal-project .section-head h2{display:flex;align-items:center;gap:8px;font-size:15px}
+.portal-project .section-head p{margin-top:4px}
+.portal-table{font-size:12px}
+.portal-table th{font-size:11px;color:#929ca9;padding:10px 12px;background:#fbfcfd}
+.portal-table td{padding:12px;vertical-align:middle}
+.portal-table td strong{font-weight:500;font-size:13px}
+.portal-table td small{color:#8c96a5}
+.portal-row{cursor:pointer}
+.portal-row:hover{background:#fafbfd}
+.portal-rtl .portal-table th,.portal-rtl .portal-table td{text-align:right}

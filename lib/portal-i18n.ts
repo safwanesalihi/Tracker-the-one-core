@@ -3,7 +3,8 @@ export type PortalLocale = 'fr' | 'ar';
 
 const fr = {
   dir: 'ltr', locale: 'fr-FR',
-  portal: 'Portail client', space: 'Votre espace', home: 'Accueil', review: 'À valider', calendar: 'Calendrier', files: 'Livrables', request: 'Demander un contenu',
+  portal: 'Portail client', space: 'Votre espace', home: 'Accueil', review: 'À valider', calendar: 'Calendrier', files: 'Livrables', request: 'Demander un contenu', projects: 'Projets',
+  colTask: 'Tâche', colStatus: 'Statut', colDate: 'Publication', colFile: 'Livrable', tasksCount: (n: number) => `${n} tâche${n !== 1 ? 's' : ''}`, noProjects: 'Aucun projet pour le moment.', noTasks: 'Aucune tâche dans ce projet.',
   hello: (name: string) => `Bonjour, ${name}`, tagline: 'Voici où en sont vos projets.',
   waiting: (n: number) => n === 1 ? '1 livrable attend votre validation.' : `${n} livrables attendent votre validation.`,
   nothingWaiting: 'Tout est validé.', nothingWaitingText: 'Les prochaines créations à valider apparaîtront ici.',
@@ -39,7 +40,8 @@ const fr = {
 
 const ar: typeof fr = {
   dir: 'rtl', locale: 'ar-MA',
-  portal: 'بوابة العميل', space: 'مساحتكم', home: 'الرئيسية', review: 'بانتظار الموافقة', calendar: 'التقويم', files: 'الملفات', request: 'طلب محتوى',
+  portal: 'بوابة العميل', space: 'مساحتكم', home: 'الرئيسية', review: 'بانتظار الموافقة', calendar: 'التقويم', files: 'الملفات', request: 'طلب محتوى', projects: 'المشاريع',
+  colTask: 'المهمة', colStatus: 'الحالة', colDate: 'النشر', colFile: 'الملف', tasksCount: (n) => `${n} مهمة`, noProjects: 'لا توجد مشاريع حالياً.', noTasks: 'لا توجد مهام في هذا المشروع.',
   hello: (name) => `مرحباً، ${name}`, tagline: 'هنا تجدون حالة مشاريعكم.',
   waiting: (n) => n === 1 ? 'ملف واحد بانتظار موافقتكم.' : `${n} ملفات بانتظار موافقتكم.`,
   nothingWaiting: 'كل شيء تمت الموافقة عليه.', nothingWaitingText: 'ستظهر هنا الأعمال القادمة التي تحتاج موافقتكم.',
