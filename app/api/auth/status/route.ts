@@ -8,5 +8,7 @@ export function GET() {
     passwordConfigured: !!sessionSettings(),
     ownerConfigured: !!(env.OWNER_EMAIL ?? '').trim() && !!(env.OWNER_PASSWORD ?? ''),
     mailConfigured: mailConfigured(),
+    // Not a secret — it's the exact address every invitation e-mail and PDF already prints.
+    authUrl: env.AUTH_URL ?? null,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
