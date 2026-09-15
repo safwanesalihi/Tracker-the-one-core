@@ -56,14 +56,15 @@ export default function FlowPage({ records, today, busy, onOpenTask, onOpenClien
   return <div className="flow-page">
     <div className="page-heading"><span className="page-symbol" aria-hidden="true"><Gauge size={22} /></span><div className="heading-line"><h1>Pilotage</h1><div className="inline"><Tabs value={periodKey} onValueChange={setPeriodKey}><TabsList><TabsTrigger value="month">Ce mois</TabsTrigger><TabsTrigger value="previous">Mois précédent</TabsTrigger><TabsTrigger value="30">30 jours</TabsTrigger></TabsList></Tabs><button className="btn" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />Actualiser</button></div></div><p>Les six nombres de The One Flow · {periodLabel}</p></div>
 
-    <div className="flow-tiles">{tiles(metrics).map((tile) => <div className={`flow-tile ${tile.ok === null ? '' : tile.ok ? 'ok' : 'warn'}`} key={tile.label}><div className="metric-label"><span>{tile.label}</span><span className="metric-icon">{createElement(tile.icon, { size: 18 })}</span></div><strong>{tile.value}</strong><small>{tile.detail}</small><span className="flow-target">Cible {tile.target}</span></div>)}</div>
+    <div className="metric-grid flow-tiles">{tiles(metrics).map((tile) => <div className={`metric-card flow-tile ${tile.ok === null ? '' : tile.ok ? 'ok' : 'warn'}`} key={tile.label}><div className="metric-label"><span>{tile.label}</span><span className="metric-icon">{createElement(tile.icon, { size: 18 })}</span></div><strong>{tile.value}</strong><small>{tile.detail}</small><span className="flow-target">Cible {tile.target}</span></div>)}</div>
 
     <div className="flow-grid">
       <section className="work-panel">
         <div className="section-head"><div><h2>Dans quel camp ?<span className="neutral-badge">{tasks.filter((t) => courtOf(t) !== 'done').length}</span></h2><p>Qui doit agir maintenant, tâche par tâche.</p></div></div>
-        <div className="flow-courts">{(['studio', 'client', 'done'] as Court[]).map((court) => <div key={court}><span className={`court ${court}`}><i />{court === 'studio' ? 'Studio' : court === 'client' ? 'Client' : 'Terminé'}</span><strong>{byCourt(court).length}</strong></div>)}</div>
-        <div className="task-rows">{byCourt('client').slice(0, 8).map((t) => <button className="task-line" key={t.id} onClick={() => onOpenTask(t.id)}><span className="task-line-icon"><Clock size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{cname(t.clientId)} · validation tacite le {t.approvalDueAt ? when(t.approvalDueAt) : '—'}</small></span><span className="court client"><i />Client</span><ChevronRight size={15} /></button>)}{!byCourt('client').length && <p className="small-note flow-empty">Rien n’attend le client.</p>}</div>
-        {!!overBudget.length && <div className="flow-warning"><AlertTriangle size={15} /><span>{overBudget.length} contenu{overBudget.length > 1 ? 's' : ''} hors forfait (plus de {flow.maxRevisionRounds} tours). Accord du propriétaire requis avant reprise.</span></div>}
+        <div className="flow-panel-body"><div className="flow-courts">{(['studio', 'client', 'done'] as Court[]).map((court) => <div key={court}><span className={`court ${court}`}><i />{court === 'studio' ? 'Studio' : court === 'client' ? 'Client' : 'Terminé'}</span><strong>{byCourt(court).length}</strong></div>)}</div>
+        {!!overBudget.length && <div className="flow-warning"><AlertTriangle size={15} /><span>{overBudget.length} contenu{overBudget.length > 1 ? 's' : ''} hors forfait (plus de {flow.maxRevisionRounds} tours). Accord du propriétaire requis avant reprise.</span></div>}</div>
+        <div className="flow-subhead"><span>Chez le client</span><span className="neutral-badge">{byCourt('client').length}</span></div>
+        <div className="task-rows">{byCourt('client').slice(0, 8).map((t) => <button className="task-line" key={t.id} onClick={() => onOpenTask(t.id)}><span className="task-line-icon"><Clock size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{cname(t.clientId)} · tacite le {t.approvalDueAt ? when(t.approvalDueAt) : '—'}</small></span><span className="court client"><i />Client</span><ChevronRight size={15} /></button>)}{!byCourt('client').length && <p className="small-note flow-empty">Rien n’attend le client.</p>}</div>
       </section>
 
       <section className="review-panel">
@@ -72,15 +73,15 @@ export default function FlowPage({ records, today, busy, onOpenTask, onOpenClien
       </section>
     </div>
 
-    <section className="flow-table">
+    <section className="work-panel flow-table">
       <div className="section-head"><div><h2>Par client</h2><p>Vendu, livré et réserve evergreen sur la période.</p></div>{!!requests.length && <span className="neutral-badge">{requests.length} demande{requests.length > 1 ? 's' : ''} à planifier</span>}</div>
-      <div className="table-area"><Table><TableHeader><TableRow><TableHead>Client</TableHead><TableHead>Vendu / mois</TableHead><TableHead>Publiés</TableHead><TableHead>Livré vs vendu</TableHead><TableHead>Chez le client</TableHead><TableHead>Réserve evergreen</TableHead></TableRow></TableHeader>
-        <TableBody>{metrics.clients.map((c) => <TableRow key={c.clientId}><TableCell><button className="table-name" onClick={() => onOpenClient(c.clientId)}>{c.name}</button></TableCell><TableCell>{c.quota ?? <span className="small-note">À renseigner</span>}</TableCell><TableCell>{c.delivered}</TableCell><TableCell className={c.ratio !== null && (c.ratio < flow.targets.deliveredVsSold[0] || c.ratio > flow.targets.deliveredVsSold[1]) ? 'overdue' : ''}>{pct(c.ratio)}</TableCell><TableCell>{byCourt('client').filter((t) => t.clientId === c.clientId).length}</TableCell><TableCell className={c.evergreen < flow.targets.evergreen ? 'overdue' : ''}>{c.evergreen} / {flow.targets.evergreen}</TableCell></TableRow>)}</TableBody></Table></div>
+      <div className="table-area"><Table className="flow-client-table"><TableHeader><TableRow><TableHead>Client</TableHead><TableHead>Vendu / mois</TableHead><TableHead>Publiés</TableHead><TableHead>Livré vs vendu</TableHead><TableHead>Chez le client</TableHead><TableHead>Réserve evergreen</TableHead></TableRow></TableHeader>
+        <TableBody>{metrics.clients.map((c) => <TableRow key={c.clientId}><TableCell><button className="table-name" onClick={() => onOpenClient(c.clientId)}>{c.name}</button></TableCell><TableCell>{c.quota ?? <span className="small-note">À renseigner</span>}</TableCell><TableCell>{c.delivered}</TableCell><TableCell><span className={`flow-value ${c.ratio !== null && (c.ratio < flow.targets.deliveredVsSold[0] || c.ratio > flow.targets.deliveredVsSold[1]) ? 'off' : c.ratio !== null ? 'ok' : ''}`}>{pct(c.ratio)}</span></TableCell><TableCell>{byCourt('client').filter((t) => t.clientId === c.clientId).length}</TableCell><TableCell><span className={`flow-value ${c.evergreen < flow.targets.evergreen ? 'off' : 'ok'}`}>{c.evergreen} / {flow.targets.evergreen}</span></TableCell></TableRow>)}</TableBody></Table></div>
       {!clients.length && <p className="small-note flow-empty">Ajoutez un client pour suivre ces nombres.</p>}
     </section>
 
-    <section className="flow-rules">
-      <h3>LES RÈGLES EN VIGUEUR</h3>
+    <section className="work-panel flow-rules">
+      <div className="section-head"><div><h2>Les règles en vigueur</h2><p>Définies dans le contrat, appliquées par l’application.</p></div></div>
       <div className="flow-rules-grid">
         <div><strong>{flow.validationHours} h</strong><p>Validation client. Le silence vaut validation ; rappels à {flow.reminderHoursLeft.join(' h et ')} h restantes.</p></div>
         <div><strong>{flow.maxRevisionRounds} tours</strong><p>Retours consolidés inclus. Le tour {flow.maxRevisionRounds + 1} est hors forfait et demande l’accord du propriétaire.</p></div>
