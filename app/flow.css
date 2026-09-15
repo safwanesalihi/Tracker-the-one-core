@@ -359,8 +359,6 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .language-switch button:hover{background:#ffffff10;color:#fff}
 .language-switch button.active{background:#E5A93C;border-color:#E5A93C;color:#1c1e23}
 .language-switch.compact{padding:0;gap:4px}
-.auth-topline{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.auth-topline .auth-logo{margin:0}
 [dir=rtl] .language-switch{direction:ltr;justify-content:flex-end}
 /* Studio in RTL (Arabic): tables, headings and rows read from the right. */
 [dir=rtl] .task-table th,[dir=rtl] .task-table td,[dir=rtl] .properties,[dir=rtl] .page-heading,[dir=rtl] .section-head,[dir=rtl] .metric-card,[dir=rtl] .client-card,[dir=rtl] .form-field{text-align:right}

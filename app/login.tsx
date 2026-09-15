@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Check, KeyRound, Loader2, Lock } from 'lucide-react';
 import LoginShowcase from '@/app/login-showcase';
-import LanguageSwitch from '@/app/language-switch';
 import { useI18n } from '@/app/locale-provider';
 
 type Step = 'sign-in' | 'change-password';
@@ -65,7 +64,7 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
 
   return <div className="auth-screen">
     <div className="auth-form google-login">
-      <div className="auth-topline"><img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" /><LanguageSwitch compact /></div>
+      <img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" />
       {step === 'sign-in' ? <>
         <h1>{t('Bienvenue')}<span className="wordmark-dot">.</span></h1>
         <p>{t('L’espace de suivi et de validation de The One Core — pour l’équipe comme pour ses clients.')}</p>
