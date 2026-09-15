@@ -88,6 +88,8 @@ The Google OAuth client must list `http://127.0.0.1:5173/api/auth/callback/googl
    Drizzle records applied migrations in the `drizzle.__drizzle_migrations` table; re-running is safe.
 3. After a schema change in `db/schema.ts`: `pnpm db:generate` then `pnpm db:migrate`.
 
+Security: migration `0002_lock_down_postgrest` enables RLS on every table (no policies) and revokes all grants from the `anon`/`authenticated` API roles — the app only ever connects as the owner role and never uses the Supabase REST API, so the public anon key gives access to nothing. Re-run `pnpm db:migrate` after adding tables; the default privileges are altered so new tables stay closed.
+
 Backups: Supabase Pro takes daily backups; `pg_dump "$DIRECT_URL" > backup.sql` works from any machine.
 
 ## Vercel
