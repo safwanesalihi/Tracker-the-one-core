@@ -99,7 +99,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         roleLabel: roleLabels[inviteContext.role],
         email: invitation.email,
         temporaryPassword: invitation.temporaryPassword,
-        url: window.location.origin,
+        url: invitation.url,
         studioName: workspace?.name || 'The One Core',
       });
       downloadPdf(bytes, `acces-${invitation.email}.pdf`);
@@ -173,7 +173,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           {invitation.sent
             ? <><MailCheck size={18} /><div><strong>{t('Invitation envoyée à {email}', { email: invitation.email })}</strong><p>{t('Le mot de passe temporaire est dans l’e-mail. À sa première connexion, la personne choisira son mot de passe.')}</p></div></>
             : <><KeyRound size={18} /><div><strong>{t('Accès créé pour {email}', { email: invitation.email })}</strong>{invitation.error && <p className="form-error">{invitation.error}</p>}<p>{t('Transmettez ces informations à la personne (elle changera le mot de passe à sa première connexion) :')}</p>
-              <dl><div><dt>{t('Adresse')}</dt><dd>{typeof window === 'undefined' ? '' : window.location.origin}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={async () => { try { await navigator.clipboard.writeText(invitation.temporaryPassword ?? ''); setCopyFeedback(t('Copié')); } catch { setCopyFeedback(t('Copie impossible. Sélectionnez le mot de passe pour le copier.')); } }}><Copy size={13} /></button>{copyFeedback && <small role="status">{copyFeedback}</small>}</dd></div></dl>
+              <dl><div><dt>{t('Adresse')}</dt><dd>{invitation.url}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={async () => { try { await navigator.clipboard.writeText(invitation.temporaryPassword ?? ''); setCopyFeedback(t('Copié')); } catch { setCopyFeedback(t('Copie impossible. Sélectionnez le mot de passe pour le copier.')); } }}><Copy size={13} /></button>{copyFeedback && <small role="status">{copyFeedback}</small>}</dd></div></dl>
               <button type="button" className="btn" disabled={pdfBusy} onClick={downloadInvitePdf}><Download size={14} />{pdfBusy ? t('Génération…') : t('Télécharger en PDF')}</button>
               {pdfError && <p className="form-error" role="alert">{pdfError}</p>}
               <p>{t('Il n’est affiché qu’une fois. Pour en générer un autre : « Renvoyer » sur la ligne du membre.')}</p></div></>}

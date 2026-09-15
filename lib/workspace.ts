@@ -14,7 +14,7 @@ export type WorkspaceMember = {
   lastLoginAt?: string | null;    // managers only
   createdAt: string;
 };
-export type Invitation = { email: string; sent: boolean; error?: string; temporaryPassword?: string };
+export type Invitation = { email: string; sent: boolean; error?: string; temporaryPassword?: string; url: string };
 export type MemberChange =
   | { action: 'set-member-role'; userId: string; expectedRole: WorkspaceRole; role: EditableRole; clientId?: string }
   | { action: 'remove-member'; userId: string; expectedRole: WorkspaceRole }

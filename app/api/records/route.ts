@@ -253,10 +253,14 @@ export async function POST(req: Request) {
     // ----- membership -----
 
     const studioName = workspace.name;
+    // The canonical address (AUTH_URL) if set, otherwise whichever origin served this request —
+    // returned to the caller too, so the on-screen address and the PDF match what the e-mail says
+    // rather than drifting to whatever domain the studio's browser happens to be on.
     const deliver = async (email: string, name: string, roleLabel: string, temporaryPassword: string, renewal: boolean) => {
-      const mail = await sendInvitation({ to: email, name, temporaryPassword, studio: studioName, url: env.AUTH_URL ?? new URL(req.url).origin, roleLabel, renewal });
+      const url = env.AUTH_URL ?? new URL(req.url).origin;
+      const mail = await sendInvitation({ to: email, name, temporaryPassword, studio: studioName, url, roleLabel, renewal });
       // The temporary password is returned only when the studio has to pass it on by hand.
-      return { email, sent: mail.sent, error: mail.error, temporaryPassword: mail.sent ? undefined : temporaryPassword };
+      return { email, sent: mail.sent, error: mail.error, temporaryPassword: mail.sent ? undefined : temporaryPassword, url };
     };
 
     if (body.action === 'invite-member') {
