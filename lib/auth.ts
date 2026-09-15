@@ -6,12 +6,14 @@ import { database } from '@/lib/database';
 import { postgresAuthAdapter } from '@/lib/auth-adapter';
 import { readAuthSettings, readSessionSettings, requestOrigin, safeCallbackUrl } from '@/lib/auth-settings';
 import { googleProfileImage } from '@/lib/profile';
-import { mayJoinByEmail } from '@/lib/access';
+import { googleAdmission } from '@/lib/access';
 
 export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; image: string | null; verified: boolean };
 export const authSettings = () => readAuthSettings(env);
 export const sessionSettings = () => readSessionSettings(env);
 export const sessionCookieName = (secure: boolean) => secure ? '__Host-the-one.session' : 'the-one.session';
+export const inviteCookieName = (secure: boolean) => secure ? '__Host-the-one.invite' : 'the-one.invite';
+export const clearInviteCookie = (secure: boolean) => `${inviteCookieName(secure)}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
 const sessionLifetime = 60 * 60 * 24 * 7;
 
 // Hashed session tokens and no provider tokens: see lib/auth-adapter.ts.
@@ -19,7 +21,7 @@ export function authAdapter() {
   return postgresAuthAdapter(database());
 }
 
-export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>>): AuthConfig {
+export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>>, inviteCode: string | null = null): AuthConfig {
   return {
     basePath: '/api/auth',
     secret: settings.secret,
@@ -50,9 +52,11 @@ export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>
         // Refresh the photo only for this verified, already-linked Google identity.
         const adapter = authAdapter();
         const existing = await adapter.getUserByAccount!({ provider: 'google', providerAccountId: account.providerAccountId });
-        if (existing) { await adapter.updateUser!({ id: existing.id, image: googleProfileImage(profile.picture) }); return true; }
-        // New account: in a closed studio only the owner or an invited address may come in.
-        return mayJoinByEmail(database(), profile.email);
+        if (existing) await adapter.updateUser!({ id: existing.id, image: googleProfileImage(profile.picture) });
+        // Closed studio: the owner comes in freely; everyone else joins with the invitation code entered on the login page.
+        const decision = await googleAdmission(database(), profile.email, !!existing, inviteCode);
+        if (decision === 'ok') return true;
+        return decision === 'AccessDenied' ? false : `${settings.origin}/login?error=${decision}`;
       },
       redirect({ url }) { return safeCallbackUrl(url, settings.origin); },
       session({ session, user }) {
@@ -78,7 +82,9 @@ export async function handleAuth(req: Request) {
     return Response.json({ error: 'Origine non autorisée.' }, { status: 403 });
   }
   try {
-    const config = authConfig(settings);
+    const inviteCookie = (req.headers.get('cookie') ?? '').split(';').map((p) => p.trim()).find((p) => p.startsWith(inviteCookieName(settings.secure) + '='));
+    const inviteCode = inviteCookie ? decodeURIComponent(inviteCookie.slice(inviteCookieName(settings.secure).length + 1)).slice(0, 20) : null;
+    const config = authConfig(settings, inviteCode);
     let failed = false;
     const logError = config.logger!.error!;
     config.logger!.error = (error) => { failed = true; logError(error); };
@@ -97,6 +103,8 @@ export async function handleAuth(req: Request) {
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('Referrer-Policy', 'no-referrer');
     response.headers.set('X-Content-Type-Options', 'nosniff');
+    // The invitation code is single-use: drop it once Google has answered.
+    if (inviteCode && url.pathname.startsWith('/api/auth/callback/')) response.headers.append('Set-Cookie', clearInviteCookie(settings.secure));
     return response;
   } catch {
     console.error('Authentication request unavailable');

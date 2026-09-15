@@ -107,6 +107,13 @@ await pg.query("INSERT INTO sessions (session_token, user_id, expires) VALUES ($
 const orphan = await api('__Host-the-one.session=orphan-token-orphan-token-orphan');
 eq([orphan.status, (await orphan.json()).code], [403, 'no-workspace']);
 eq((await pg.query("SELECT count(*)::int AS n FROM workspaces WHERE created_by = 'orphan'")).rows[0].n, 0, 'no workspace created for the orphan');
+// A member who once had a personal workspace (open mode) sees only the studio in closed mode.
+const dalilaView = await (await api(dalila.cookie)).json();
+eq(dalilaView.workspaces.map((w) => w.role), ['admin'], 'no self-owned workspace offered to a member');
+await pg.query("INSERT INTO workspaces (id, name, created_by) VALUES ('ws:leftover', 'Leftover', $1)", [(await pg.query("SELECT id FROM users WHERE email = 'dalila@studio.test'")).rows[0].id]);
+await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ('ws:leftover', $1, 'owner')", [(await pg.query("SELECT id FROM users WHERE email = 'dalila@studio.test'")).rows[0].id]);
+const dalilaAgain = await (await api(dalila.cookie)).json();
+eq(dalilaAgain.workspaces.map((w) => w.role), ['admin'], 'leftover personal workspace hidden in closed mode');
 delete globalThis.testEnv.OWNER_EMAIL;
 
 await pg.close();

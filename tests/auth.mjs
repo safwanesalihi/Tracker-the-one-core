@@ -10,7 +10,7 @@ const esbuildPath = globSync('node_modules/.pnpm/esbuild@*/node_modules/esbuild/
 const esbuild = await import(pathToFileURL(esbuildPath));
 mkdirSync('.sites-runtime/auth-tests', { recursive: true });
 await esbuild.build({
-  entryPoints: { auth: 'lib/auth.ts', settings: 'lib/auth-settings.ts', records: 'app/api/records/route.ts', status: 'app/api/auth/status/route.ts' },
+  entryPoints: { auth: 'lib/auth.ts', settings: 'lib/auth-settings.ts', records: 'app/api/records/route.ts', status: 'app/api/auth/status/route.ts', invite: 'app/api/auth/invite-code/route.ts' },
   outdir: '.sites-runtime/auth-tests', outExtension: { '.js': '.mjs' },
   bundle: true, platform: 'node', format: 'esm', external: ['@auth/core', '@auth/core/*'],
   plugins: [{ name: 'auth-test-runtime', setup(build) {
@@ -35,6 +35,7 @@ const { handleAuth, getAppUser, authAdapter, authConfig, authSettings } = await 
 const { readAuthSettings, safeCallbackUrl } = await import(pathToFileURL(process.cwd() + '/.sites-runtime/auth-tests/settings.mjs'));
 const records = await import(pathToFileURL(process.cwd() + '/.sites-runtime/auth-tests/records.mjs'));
 const status = await import(pathToFileURL(process.cwd() + '/.sites-runtime/auth-tests/status.mjs'));
+const inviteRoute = await import(pathToFileURL(process.cwd() + '/.sites-runtime/auth-tests/invite.mjs'));
 for (const AUTH_URL of ['http://example.com', 'https://u:p@tracker.test', origin + '/subpath', origin + '?x=1', 'https://tracker.chatgpt.site']) assert.equal(readAuthSettings({ ...config, AUTH_URL }), null);
 assert.ok(readAuthSettings({ ...config, AUTH_URL: 'http://127.0.0.1:5173' }));
 assert.equal(readAuthSettings({ ...config, AUTH_SECRET: 'short' }), null);
@@ -182,11 +183,37 @@ try {
   assert.equal(await getAppUser(identityRequest(uninvited.jar)), null);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM users WHERE email = 'uninvited@example.test'")).rows[0].n, 0);
   await pg.query("INSERT INTO workspaces (id, name, created_by) VALUES ('ws:host', 'Studio', 'host')");
-  await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role, email) VALUES ('ws:host', 'invite:invited@example.test', 'viewer', 'invited@example.test')");
-  const invitedFlow = await begin({ sub: 'google-subject-d', email: 'invited@example.test' }); await finish(invitedFlow);
+  await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role, email, invite_code) VALUES ('ws:host', 'invite:invited@example.test', 'viewer', 'invited@example.test', 'ABCD-EFGH')");
+  // Invited, but no code entered → sent back to the login page asking for it; nothing written.
+  const noCode = await begin({ sub: 'google-subject-d', email: 'invited@example.test' }); const askCode = await finish(noCode);
+  assert.match(askCode.headers.get('location') ?? '', /error=InviteCodeRequired/);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM users WHERE email = 'invited@example.test'")).rows[0].n, 0);
+  // Wrong code → refused with a specific message.
+  async function withCode(code, overrides) {
+    const jar = new Map();
+    const stored = await inviteRoute.POST(new Request(origin + '/api/auth/invite-code', { method: 'POST', headers: { origin, 'content-type': 'application/json', cookie: jarHeader(jar) }, body: JSON.stringify({ code }) }));
+    assert.equal(stored.status, 200); absorb(jar, stored);
+    assert.ok(jar.has('__Host-the-one.invite'), 'invite cookie set');
+    const csrf = await (await auth('/api/auth/csrf', { jar })).json();
+    const response = await auth('/api/auth/signin/google', { jar, method: 'POST', body: { csrfToken: csrf.csrfToken, callbackUrl: origin + '/#home' } });
+    const location = new URL(response.headers.get('location'));
+    const code2 = crypto.randomUUID();
+    codes.set(code2, { sub: 'google-subject-d', email: 'invited@example.test', challenge: location.searchParams.get('code_challenge'), nonce: location.searchParams.get('nonce'), ...overrides });
+    return { jar, code: code2, state: location.searchParams.get('state') };
+  }
+  assert.equal((await inviteRoute.POST(new Request(origin + '/api/auth/invite-code', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify({ code: 'nope' }) }))).status, 400);
+  const wrong = await withCode('zzzz-zzzz'); const wrongDone = await finish(wrong);
+  assert.match(wrongDone.headers.get('location') ?? '', /error=InvalidInviteCode/);
+  assert.ok(!wrong.jar.has('__Host-the-one.invite'), 'invite cookie cleared after the callback');
+  // Right code (typed loosely) → account created, invitation claimed on first load, and the code is gone.
+  const invitedFlow = await withCode('abcd efgh'); await finish(invitedFlow);
   const invitedUser = await getAppUser(identityRequest(invitedFlow.jar)); assert.equal(invitedUser?.email, 'invited@example.test');
   const invitedView = await (await records.GET(identityRequest(invitedFlow.jar))).json();
   assert.equal(invitedView.workspace.id, 'ws:host'); assert.equal(invitedView.workspace.role, 'viewer');
+  assert.deepEqual(invitedView.workspaces.map((w) => w.id), ['ws:host'], 'no personal workspace is created or offered');
+  // Second sign-in: Google alone is enough.
+  const returning = await begin({ sub: 'google-subject-d', email: 'invited@example.test' }); await finish(returning);
+  assert.equal((await (await records.GET(identityRequest(returning.jar))).json()).workspace.id, 'ws:host');
   const existingFlow = await begin({ sub: 'google-subject-b', email: 'second@example.test' }); await finish(existingFlow);
   assert.ok(await getAppUser(identityRequest(existingFlow.jar)), 'accounts created earlier keep signing in');
   delete globalThis.authTestEnv.OWNER_EMAIL;

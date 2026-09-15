@@ -5,7 +5,11 @@ async function csrfToken() {
   return data.csrfToken as string;
 }
 
-export async function startGoogleSignIn() {
+export async function startGoogleSignIn(inviteCode?: string) {
+  if (inviteCode?.trim()) {
+    const response = await fetch('/api/auth/invite-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: inviteCode }) });
+    if (!response.ok) throw new Error(((await response.json()) as { error?: string }).error || 'Code d’invitation invalide.');
+  }
   const token = await csrfToken();
   // Top-level form navigation lets Google handle passwords/consent in its own origin.
   const form = document.createElement('form');

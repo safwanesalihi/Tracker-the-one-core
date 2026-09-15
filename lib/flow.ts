@@ -265,3 +265,18 @@ export function portalView(records: RecordItem[], clientId: string): RecordItem[
   void drive; void contract;
   return [visibleClient, ...projects, ...tasks, ...comments, ...events];
 }
+
+// ---------- what a creative (member) may see ----------
+
+/** A member sees every active client and project (for context) but only the tasks assigned to them. */
+export function memberView(records: RecordItem[], identities: string[]): RecordItem[] {
+  const mine = new Set(identities.map((v) => v.trim().toLowerCase()).filter(Boolean));
+  const assignedToMe = (task: RecordItem) => !!task.assignee && mine.has(task.assignee.trim().toLowerCase());
+  const clients = records.filter((r) => r.kind === 'client');
+  const projects = records.filter((r) => r.kind === 'project');
+  const tasks = records.filter((r) => r.kind === 'task' && assignedToMe(r));
+  const taskIds = new Set(tasks.map((t) => t.id));
+  const comments = records.filter((r) => r.kind === 'comment' && !!r.taskId && taskIds.has(r.taskId));
+  const events = records.filter((r) => r.kind === 'event' && !!r.taskId && taskIds.has(r.taskId));
+  return [...clients, ...projects, ...tasks, ...comments, ...events];
+}

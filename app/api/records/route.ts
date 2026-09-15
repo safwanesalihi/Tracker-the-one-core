@@ -8,7 +8,7 @@ import {
   type WorkspaceContext, type WorkspaceMember, type WorkspaceSummary,
 } from '@/lib/workspace';
 import {
-  approve, dayIn, flow, lockApplies, portalView, publish, requestChanges, sendForValidation,
+  approve, dayIn, flow, lockApplies, memberView, portalView, publish, requestChanges, sendForValidation,
 } from '@/lib/flow';
 import { applySweep, insertRecord, loadRecords } from '@/lib/flow-server';
 import { newInviteCode } from '@/lib/password-auth';
@@ -56,8 +56,9 @@ async function ensureWorkspace(owner: string, name: string): Promise<WorkspaceCo
 async function claimInvites(user: AppUser) {
   if (!user.verified) return; // password accounts claim with the invitation code at sign-in
   const pending = inviteId(user.email);
+  // Only invitations whose code was entered at Google sign-in (invite_code cleared) are claimed by e-mail.
   const invites = await database().query<{ workspaceId: string }>(
-    'SELECT workspace_id AS "workspaceId" FROM workspace_members WHERE user_id = $1', [pending],
+    'SELECT workspace_id AS "workspaceId" FROM workspace_members WHERE user_id = $1 AND invite_code IS NULL', [pending],
   );
   if (!invites.length) return;
   const name = user.fullName || user.displayName;
@@ -71,11 +72,14 @@ async function claimInvites(user: AppUser) {
 }
 
 const membershipOrder = 'ORDER BY CASE WHEN w.created_by = wm.user_id THEN 1 ELSE 0 END, wm.created_at ASC, w.id ASC';
+// In a closed studio, a member's own leftover workspace (from before the rule) is never offered.
+const hideOwnWorkspace = (user: AppUser) => closedStudio() && !isOwnerEmail(user.email);
+const membershipFilter = 'AND ($2::boolean IS NOT TRUE OR w.created_by <> wm.user_id)';
 
-async function workspacesFor(userId: string): Promise<WorkspaceSummary[]> {
+async function workspacesFor(user: AppUser): Promise<WorkspaceSummary[]> {
   const rows = await database().query<WorkspaceSummary>(
-    `SELECT w.id, w.name, wm.role FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id WHERE wm.user_id = $1 ${membershipOrder}`,
-    [userId],
+    `SELECT w.id, w.name, wm.role FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id WHERE wm.user_id = $1 ${membershipFilter} ${membershipOrder}`,
+    [user.userId, hideOwnWorkspace(user)],
   );
   return rows.filter((w) => isWorkspaceRole(w.role));
 }
@@ -85,8 +89,8 @@ async function workspaceFor(user: AppUser, requestedId?: string | null): Promise
   // A member lands in the studio that invited them before their own empty workspace.
   const membership = await one<MembershipRow>(
     `${membershipSelect} FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id
-     WHERE wm.user_id = $1 AND ($2::text IS NULL OR w.id = $2) ${membershipOrder} LIMIT 1`,
-    [user.userId, requestedId ?? null],
+     WHERE wm.user_id = $1 AND ($3::text IS NULL OR w.id = $3) ${membershipFilter} ${membershipOrder} LIMIT 1`,
+    [user.userId, hideOwnWorkspace(user), requestedId ?? null],
   );
   if ((membership && !isWorkspaceRole(membership.role)) || (!membership && requestedId)) {
     throw new WorkspaceAccessError();
@@ -126,18 +130,26 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function visibleTo(workspace: WorkspaceContext, rows: RecordItem[]) {
-  return workspace.role === 'client' ? portalView(rows, workspace.clientId!) : rows;
+const identitiesOf = (user: AppUser) => [user.fullName ?? '', user.displayName, user.email];
+const isMine = (user: AppUser, task: RecordItem) =>
+  !!task.assignee && identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase());
+
+function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
+  if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
+  if (workspace.role === 'creative') return memberView(rows, identitiesOf(user));
+  return rows;
 }
 
 async function payload(workspace: WorkspaceContext, user: AppUser, rows?: RecordItem[]) {
   rows ??= await all(workspace.id);
+  const roster = workspace.role === 'client' ? [] : await members(workspace.id, canManageMembers(workspace.role));
   return {
-    records: visibleTo(workspace, rows),
+    records: visibleTo(workspace, rows, user),
     user: { id: user.userId, name: user.fullName || user.displayName, email: user.email, image: user.image ?? null },
     workspace,
-    members: workspace.role === 'client' ? [] : await members(workspace.id, canManageMembers(workspace.role)),
-    workspaces: await workspacesFor(user.userId),
+    // Members get the roster for display only: no e-mails, no pending invitations.
+    members: canManageMembers(workspace.role) ? roster : roster.filter((m) => !m.userId.startsWith('invite:')).map((m) => ({ ...m, email: m.userId === user.userId ? m.email : null })),
+    workspaces: await workspacesFor(user),
     today: dayIn(new Date()),
   };
 }
@@ -208,6 +220,7 @@ export async function POST(req: Request) {
       const task = rows.find((r) => r.id === id && r.kind === 'task');
       if (!task || parentArchived(rows, task)) return null;
       if (workspace.role === 'client' && task.clientId !== workspace.clientId) return null;
+      if (workspace.role === 'creative' && !isMine(user, task)) return null;
       return task;
     };
 
@@ -378,7 +391,7 @@ export async function POST(req: Request) {
     // ----- request bank: the portal form -----
 
     if (body.action === 'request') {
-      if (workspace.role === 'viewer') return response({ error: 'Votre rôle est en lecture seule.' }, 403);
+      if (workspace.role === 'viewer' || workspace.role === 'creative') return response({ error: 'Seuls les administrateurs saisissent une demande au nom d’un client.' }, 403);
       const clientId = workspace.role === 'client' ? workspace.clientId : body.clientId;
       const client = rowsNow.find((r) => r.kind === 'client' && r.id === clientId && !r.archived);
       if (!client) return response({ error: 'Client introuvable.' }, 404);
@@ -435,10 +448,21 @@ export async function POST(req: Request) {
         ? rows.find((record) => record.id === body.id && record.kind === body.kind)
         : undefined;
     if (body.action === 'update' && !existing) return response({ error: 'Élément introuvable.' }, 404);
+    if (workspace.role === 'creative') {
+      if (body.kind === 'project') return response({ error: 'Les sous-projets sont gérés par les administrateurs.' }, 403);
+      if (existing && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
+    }
 
     const parsed = fields.safeParse(body.data);
     if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
     const data = parsed.data;
+    if (workspace.role === 'creative' && body.kind === 'task') {
+      // A member's tasks are their own: created for themselves, never handed to someone else.
+      if (!data.assignee) data.assignee = user.fullName || user.displayName;
+      else if (!identitiesOf(user).some((v) => v.trim().toLowerCase() === data.assignee!.trim().toLowerCase())) {
+        return response({ error: 'Vous ne pouvez assigner une tâche qu’à vous-même.' }, 403);
+      }
+    }
     if (body.kind === 'task' && data.assignee) {
       const availableMembers = await members(workspace.id);
       const allowedAssignees = new Set(

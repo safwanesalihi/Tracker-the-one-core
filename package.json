@@ -12,7 +12,7 @@
     "lint": "eslint . --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "node tests/records.mjs && node tests/team.mjs && node tests/auth.mjs && node tests/password.mjs && node tests/task-draft.mjs && node tests/flow.mjs && node tests/flow-api.mjs",
+    "test": "node tests/records.mjs && node tests/team.mjs && node tests/auth.mjs && node tests/password.mjs && node tests/roles.mjs && node tests/task-draft.mjs && node tests/flow.mjs && node tests/flow-api.mjs",
     "auth:check": "node scripts/check-google-config.mjs"
   },
   "dependencies": {

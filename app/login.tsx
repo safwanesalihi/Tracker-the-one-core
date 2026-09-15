@@ -7,6 +7,8 @@ import LoginShowcase from '@/app/login-showcase';
 
 const errors: Record<string, string> = {
   AccessDenied: 'Accès sur invitation uniquement. Cette adresse Google n’a pas été invitée par le studio (ou son e-mail n’est pas vérifié).',
+  InviteCodeRequired: 'Cette adresse a bien une invitation : saisissez le code d’invitation fourni par le studio, puis continuez avec Google.',
+  InvalidInviteCode: 'Code d’invitation invalide pour cette adresse Google. Vérifiez le code auprès du studio.',
   OAuthAccountNotLinked: 'Ce compte n’est pas lié à cet espace. Contactez le propriétaire.',
   OAuthCallbackError: 'La connexion a expiré ou n’a pas pu être vérifiée. Réessayez.',
   Configuration: 'La connexion Google n’est pas encore configurée.',
@@ -43,7 +45,7 @@ export default function Login() {
     if (starting.current) return;
     starting.current = true;
     setGoogleBusy(true); setError('');
-    try { await startGoogleSignIn(); }
+    try { await startGoogleSignIn(withCode ? form.inviteCode : undefined); }
     catch (error) { setError((error as Error).message); setGoogleBusy(false); starting.current = false; }
   }
 
@@ -82,7 +84,7 @@ export default function Login() {
         <label><span>Mot de passe</span><input type="password" required minLength={mode === 'sign-up' ? 10 : 1} maxLength={200} autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'} value={form.password} onChange={set('password')} placeholder={mode === 'sign-up' ? '10 caractères minimum' : '••••••••••'} /></label>
         {withCode
           ? <label><span>Code d’invitation</span><input maxLength={20} autoComplete="off" value={form.inviteCode} onChange={set('inviteCode')} placeholder="ABCD-EFGH" style={{ textTransform: 'uppercase' }} /></label>
-          : <button type="button" className="text-link auth-code-toggle" onClick={() => setWithCode(true)}>J’ai un code d’invitation</button>}
+          : <button type="button" className="text-link auth-code-toggle" onClick={() => setWithCode(true)}>J’ai un code d’invitation (première connexion)</button>}
         <button className="btn primary auth-submit" disabled={!ready || !configured?.password || busy || googleBusy}>
           {busy ? <Loader2 size={18} className="spin" /> : <Lock size={16} />}
           {mode === 'sign-up' ? 'Créer mon compte' : 'Se connecter'}
@@ -95,7 +97,7 @@ export default function Login() {
         {googleBusy || !ready ? <Loader2 size={20} className="spin" /> : <img src="/google-g.png" width={20} height={20} alt="" />}
         {googleBusy ? 'Redirection…' : 'Continuer avec Google'}
       </button>
-      <p className="google-login-note">Avec Google, aucun mot de passe n’est enregistré par The One Core. Un compte avec mot de passe est lié à son adresse e-mail : les invitations se rejoignent avec le code fourni par le studio.</p>
+      <p className="google-login-note">Première connexion sur invitation : saisissez le code fourni par le studio ci-dessus, puis continuez avec Google ou créez un mot de passe. Ensuite, Google ou e-mail + mot de passe suffisent.</p>
       {configured?.google === false && ready && <div className="auth-setup" role="status"><strong>Configuration Google requise</strong><p>Le bouton Google sera disponible lorsque les identifiants Google de l’application auront été ajoutés.</p><button type="button" className="text-link" onClick={() => { setError(''); setConfigured(null); void checkConfiguration(); }}>Vérifier à nouveau</button></div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <small className="auth-privacy"><Lock size={14} />Vos données restent privées. Les mots de passe sont stockés hachés et jamais en clair.</small>

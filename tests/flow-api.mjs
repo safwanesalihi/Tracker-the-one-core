@@ -62,6 +62,7 @@ ok(invited.members.some((m) => m.userId === 'invite:amina@client.test' && m.role
 await post({ action: 'invite-member', email: 'AMINA@client.test', role: 'viewer' }, 409);
 await post({ action: 'invite-member', email: 'yasmine@studio.test', role: 'creative' });
 
+await pg.query("UPDATE workspace_members SET invite_code = NULL WHERE user_id LIKE 'invite:%'"); // codes entered at Google sign-in (covered in tests/auth.mjs)
 globalThis.testUser = contact;
 const portal = await get(200, null);
 eq([portal.workspace.id, portal.workspace.role, portal.workspace.clientId], [WS, 'client', c.id], 'the contact lands in the studio workspace as a client');

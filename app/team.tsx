@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import Avatar from '@/app/profile-avatar';
-import { canManageMembers, isInvite, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
+import { canManageMembers, invitableRoles, isInvite, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
 import type { RecordItem } from '@/lib/model';
 
 type Props = {
@@ -96,7 +96,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         <div className="section-head"><div><h2 id="team-invite-title">Inviter une personne</h2><p>Avec Google, l’invitation s’active à la première connexion avec cette adresse. Avec un mot de passe, la personne saisit le code d’invitation affiché ci-dessous. Aucun e-mail n’est envoyé par l’application : transmettez-lui le lien et le code vous-même.</p></div></div>
         <form className="team-invite-form" onSubmit={sendInvite}>
           <label className="form-field"><span>Adresse e-mail Google</span><input type="email" required maxLength={200} value={invite.email} disabled={disabled} onChange={(event) => setInvite({ ...invite, email: event.target.value })} placeholder="prenom@entreprise.com" /></label>
-          <label className="form-field"><span>Rôle</span><Select value={invite.role} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, role: value as EditableRole })}><SelectTrigger className="pick" aria-label="Rôle de l’invité"><SelectValue /></SelectTrigger><SelectContent>{workspaceRoles.filter((value) => value !== 'owner').map((value) => <SelectItem key={value} value={value}>{roleLabels[value]}</SelectItem>)}</SelectContent></Select></label>
+          <label className="form-field"><span>Rôle</span><Select value={invite.role} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, role: value as EditableRole })}><SelectTrigger className="pick" aria-label="Rôle de l’invité"><SelectValue /></SelectTrigger><SelectContent>{invitableRoles.map((value) => <SelectItem key={value} value={value}>{roleLabels[value]}</SelectItem>)}</SelectContent></Select></label>
           {invite.role === 'client' && <label className="form-field"><span>Client</span><Select value={invite.clientId || '__none'} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, clientId: value === '__none' ? '' : value })}><SelectTrigger className="pick" aria-label="Client de l’invité"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">Choisir un client</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <button className="btn primary" disabled={disabled || (invite.role === 'client' && !invite.clientId)}><UserPlus size={15} />{saving ? 'Enregistrement…' : 'Inviter'}</button>
         </form>
@@ -138,7 +138,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       </section>
       <div className="team-lower">
         <section><h2>Qui peut faire quoi ?</h2><p>Les accès sont vérifiés à chaque action.</p>
-          <div className="team-permissions">{workspaceRoles.map((value) => <div key={value}><ShieldCheck size={16} /><div><strong>{roleLabels[value]}</strong><p>{roleDescriptions[value]}</p></div></div>)}</div>
+          <div className="team-permissions">{workspaceRoles.filter((value) => value !== 'viewer' || members.some((m) => m.role === 'viewer')).map((value) => <div key={value}><ShieldCheck size={16} /><div><strong>{roleLabels[value]}</strong><p>{roleDescriptions[value]}</p></div></div>)}</div>
         </section>
         <section className="team-tip"><span className="onboarding-icon"><Lock size={20} /></span><h3>Un accès à tout l’espace</h3><p>Les membres du studio voient tout l’espace. Un accès « Client » ne voit que le portail de son client : livrables, validation, retours, demandes et calendrier.</p><p>L’application n’envoie aucun e-mail : partagez l’adresse du portail à la personne invitée. Elle se connecte avec Google, ou crée un mot de passe et saisit son code d’invitation.</p></section>
       </div>
@@ -147,7 +147,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <DialogContent className="tracker-modal team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.focus(); }}>
         <DialogHeader><DialogTitle>Modifier le rôle</DialogTitle><DialogDescription>{editing && memberName(editing)} · Le nouvel accès prend effet dès l’enregistrement.</DialogDescription></DialogHeader>
         <form onSubmit={(event) => { event.preventDefault(); if (editing) void save({ action: 'set-member-role', userId: editing.userId, expectedRole: editing.role, role, ...(role === 'client' ? { clientId: roleClient } : {}) }); }}>
-          <label className="form-field"><span>Rôle dans l’espace</span><Select value={role} disabled={disabled} onValueChange={(value) => setRole(value as EditableRole)}><SelectTrigger className="pick" aria-label="Nouveau rôle"><SelectValue /></SelectTrigger><SelectContent>{workspaceRoles.filter((value) => value !== 'owner').map((value) => <SelectItem key={value} value={value}>{roleLabels[value]}</SelectItem>)}</SelectContent></Select></label>
+          <label className="form-field"><span>Rôle dans l’espace</span><Select value={role} disabled={disabled} onValueChange={(value) => setRole(value as EditableRole)}><SelectTrigger className="pick" aria-label="Nouveau rôle"><SelectValue /></SelectTrigger><SelectContent>{[...invitableRoles, ...(editing?.role === 'viewer' ? ['viewer' as const] : [])].map((value) => <SelectItem key={value} value={value}>{roleLabels[value]}</SelectItem>)}</SelectContent></Select></label>
           {role === 'client' && <label className="form-field"><span>Client</span><Select value={roleClient || '__none'} disabled={disabled} onValueChange={(value) => setRoleClient(value === '__none' ? '' : value)}><SelectTrigger className="pick" aria-label="Client"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">Choisir un client</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <p className="team-role-description">{roleDescriptions[role]}</p>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}

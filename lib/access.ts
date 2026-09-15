@@ -16,8 +16,26 @@ export async function hasPendingInvite(db: Db, email: string) {
   return rows.length > 0;
 }
 
-/** May this e-mail create an account through Google (verified e-mail)? Existing accounts are handled by the caller. */
-export async function mayJoinByEmail(db: Db, email: string) {
-  if (!closedStudio() || isOwnerEmail(email)) return true;
-  return hasPendingInvite(db, email);
+export const normalizeInviteCode = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2');
+
+/** Marks the invitation for this e-mail as verified by its code. Claiming then happens at the first workspace load. */
+export async function consumeInviteCode(db: Db, email: string, code: string) {
+  const rows = await db.query(
+    'UPDATE workspace_members SET invite_code = NULL WHERE user_id = $1 AND invite_code = $2 RETURNING workspace_id',
+    [inviteId(email), normalizeInviteCode(code)],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Decision for a Google sign-in. Existing accounts always pass (an optional code lets them join another studio).
+ * New accounts: the owner, or an invitation whose code has been entered; otherwise a reason to show on the login page.
+ */
+export async function googleAdmission(db: Db, email: string, isExistingAccount: boolean, code: string | null) {
+  if (code) {
+    if (!(await consumeInviteCode(db, email, code))) return 'InvalidInviteCode';
+    return 'ok';
+  }
+  if (isExistingAccount || !closedStudio() || isOwnerEmail(email)) return 'ok';
+  return (await hasPendingInvite(db, email)) ? 'InviteCodeRequired' : 'AccessDenied';
 }
