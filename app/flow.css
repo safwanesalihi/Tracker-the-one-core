@@ -279,3 +279,33 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .portal-progress [data-slot=progress-indicator]{background:#3d8763}
 .portal-rtl .portal-mix strong{text-align:left}
 @media (max-width:1000px){.portal-dashboard{grid-template-columns:1fr}.portal-stats-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-inner]{background:#1c1e23}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-container]{border-right:0}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-header]{padding:12px 16px 0}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-content]{padding-top:20px;gap:25px}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-group]{padding:0 16px}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-group-label]{color:#737985;height:30px;font-size:10px;letter-spacing:.1em;font-weight:500;padding-left:11px;margin-bottom:7px}
+[data-slot=sidebar][data-mobile=true] .nav-item{height:41px!important;padding:10px 12px!important;color:#a2a7b2!important;gap:12px!important;border-radius:8px!important}
+[data-slot=sidebar][data-mobile=true] .nav-item:hover{color:#eef0f5!important;background:#272930!important}
+[data-slot=sidebar][data-mobile=true] .nav-item[data-active=true]{background:#efb849!important;color:#211f19!important;box-shadow:0 3px 8px #00000012;font-weight:600!important}
+[data-slot=sidebar][data-mobile=true] .nav-item[data-active=true]:before{display:none}
+[data-slot=sidebar][data-mobile=true] .nav-item>span{font-size:13px}
+[data-slot=sidebar][data-mobile=true] .nav-item svg{width:18px!important;height:18px!important;stroke-width:1.65}
+[data-slot=sidebar][data-mobile=true] .nav-item .counter{background:#ffffff0d;color:#a2a7b2;min-width:23px;font-size:11px}
+[data-slot=sidebar][data-mobile=true] .nav-item[data-active=true] .counter{background:#241c1b10;color:#302818}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-footer]{padding:12px 15px}
+[data-slot=sidebar][data-mobile=true] .nav-item>span{font-size:14px}
+
+/* Mobile drawer: the same dark sidebar as on desktop (the Sheet does not carry .tracker-sidebar). */
+[data-slot=sidebar][data-mobile=true]{background:#1c1e23!important;color:#fff}
+[data-slot=sidebar][data-mobile=true] .nav-item{color:#a2a7b2!important}
+[data-slot=sidebar][data-mobile=true] .nav-item>span{color:inherit}
+[data-slot=sidebar][data-mobile=true] .nav-item[data-active=true]{color:#211f19!important}
+[data-slot=sidebar][data-mobile=true] [data-slot=sidebar-group-label]{color:#737985}
+[data-slot=sidebar][data-mobile=true] .brand strong,[data-slot=sidebar][data-mobile=true] .user-row strong{color:#fff}
+[data-slot=sidebar][data-mobile=true] .user-row small,[data-slot=sidebar][data-mobile=true] .sidebar-caption small{color:#9aa0ab}
+[data-slot=sidebar][data-mobile=true] .user-row button{color:#a2a7b2}
+[data-slot=sidebar][data-mobile=true] .keyboard-hint{color:#737985}
+[data-slot=sidebar][data-mobile=true] .section-plus{color:#a2a7b2}
+[data-slot=sidebar][data-mobile=true] .workspace-switch{color:#a2a7b2}
