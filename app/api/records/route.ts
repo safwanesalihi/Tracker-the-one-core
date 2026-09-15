@@ -536,17 +536,23 @@ export async function POST(req: Request) {
     if (workspace.role === 'creative' && !!data.archived !== !!existing?.archived) {
       return response({ error: 'Seuls les administrateurs peuvent archiver ou restaurer des éléments.' }, 403);
     }
-    // A member's only edit on a task is the deliverable link; every other field is read-only for them.
+    // A member's only edits on a task are the deliverable link and moving it between "En cours"
+    // and "À valider"; every other field (and "À faire"/"Validé") is off-limits for them.
     // Falsy values (undefined/null/false/'') are treated as equivalent so an unset field sent back
-    // as its default (e.g. archived: false) is never mistaken for a change.
+    // as its default (e.g. archived: false) is never mistaken for a change. "publishable" is the
+    // one field that defaults to true when unset (the form always resends a real boolean for it),
+    // so it gets the same "unset means true" normalization used everywhere else it's read.
     if (workspace.role === 'creative' && body.kind === 'task' && existing) {
-      const memberEditableFields = new Set(['deliverable']);
-      const normalize = (value: unknown) => (value || null);
+      const memberEditableFields = new Set(['deliverable', 'status']);
+      const normalize = (key: string, value: unknown) => (key === 'publishable' ? value !== false : value || null);
       const touchedFields = (Object.keys(data) as (keyof typeof data)[]).filter(
-        (key) => normalize(data[key]) !== normalize((existing as Record<string, unknown>)[key]),
+        (key) => normalize(key, data[key]) !== normalize(key, (existing as Record<string, unknown>)[key]),
       );
       if (touchedFields.some((key) => !memberEditableFields.has(key as string))) {
-        return response({ error: 'Un membre ne peut modifier que le lien livrable de cette tâche.' }, 403);
+        return response({ error: 'Un membre ne peut modifier que le lien livrable et le statut de cette tâche.' }, 403);
+      }
+      if (touchedFields.includes('status') && !['En cours', 'À valider'].includes(data.status || '')) {
+        return response({ error: 'Un membre ne peut passer une tâche qu’en cours ou à valider.' }, 403);
       }
     }
     if (existing?.archived && data.archived !== false) {

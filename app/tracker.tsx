@@ -200,11 +200,13 @@ function StatusPick({
   task,
   disabled,
   allowApproval = true,
+  member = false,
   onChange,
 }: {
   task: RecordItem;
   disabled?: boolean;
   allowApproval?: boolean;
+  member?: boolean;
   onChange: (s: Status) => void;
 }) {
   const { t: tr } = useI18n();
@@ -231,9 +233,12 @@ function StatusPick({
         </span>
       </SelectTrigger>
       <SelectContent position="popper" align="start">
-        {statuses
-          .filter((s) => s !== "À valider" && (allowApproval || s !== "Validé"))
-          .map((s) => (
+        {(member
+          ? statuses.filter((s) => s === "En cours" || s === "À valider" || s === task.status)
+          : allowApproval
+            ? [...statuses]
+            : statuses.filter((s) => s !== "À valider" && s !== "Validé")
+        ).map((s) => (
           <SelectItem key={s} value={s}>
             <span className="inline">
               <span aria-hidden="true">
@@ -1203,6 +1208,7 @@ export default function Tracker() {
                   <TableCell>
                     <StatusPick
                       allowApproval={manager}
+                      member={member}
                       task={t}
                       disabled={
                         archived(t) || busy || workspace?.role === "viewer"
@@ -1370,14 +1376,18 @@ export default function Tracker() {
       <div className="board">
         {statuses.map((s) => {
           const draggingTask = tasks.find((t) => t.id === draggingTaskId);
+          // Members may only move a task to "En cours" or "À valider". Owner/admin can move a
+          // task anywhere. Everyone else (viewer) can't reach "À valider" or "Validé" manually.
+          const statusReachable = member
+            ? s === "En cours" || s === "À valider"
+            : manager || (s !== "À valider" && s !== "Validé");
           const dropAllowed =
             !!draggingTask &&
             writable &&
             !busy &&
             !archived(draggingTask) &&
             draggingTask.status !== s &&
-            s !== "À valider" &&
-            (manager || s !== "Validé");
+            statusReachable;
           return (
           <section
             className={`board-column ${dragOverStatus === s ? (dropAllowed ? "drag-over" : "drag-over-blocked") : ""}`}
@@ -1399,13 +1409,13 @@ export default function Tracker() {
               const t = tasks.find(
                 (t) => t.id === e.dataTransfer.getData("text/plain"),
               );
-              if (t && writable && !busy && !archived(t) && t.status !== s && s !== "À valider" && (manager || s !== "Validé")) void update(t, { status: s });
+              if (t && writable && !busy && !archived(t) && t.status !== s && statusReachable) void update(t, { status: s });
             }}
           >
             <header>
               <Chip status={s} />
               <small>{filtered.filter((t) => t.status === s).length}</small>
-              {manager && s !== "À valider" && (
+              {manager && (
                 <button
                   aria-label={tr("Créer une tâche {status}", { status: tr(s) })}
                   onClick={() => open("task", undefined, { status: s })}
@@ -1491,7 +1501,7 @@ export default function Tracker() {
                   )}
                 </article>
               ))}
-            {manager && s !== "À valider" && (
+            {manager && (
               <button
                 className="add-row"
                 onClick={() => open("task", undefined, { status: s })}
@@ -2977,9 +2987,13 @@ export default function Tracker() {
                     onChange={(s) => {
                       if (s) void update(task, { status: s as Status });
                     }}
-                    items={(manager ? [...statuses] : statuses.filter((s) => s !== "Validé")).filter(
-                      (s) => s !== "À valider" || task.status === "À valider",
-                    )}
+                    items={
+                      manager
+                        ? [...statuses]
+                        : member
+                          ? statuses.filter((s) => s === "En cours" || s === "À valider" || s === task.status)
+                          : statuses.filter((s) => s !== "Validé" && (s !== "À valider" || task.status === "À valider"))
+                    }
                   />
                 </dd>
               </div>
@@ -3562,10 +3576,23 @@ export default function Tracker() {
                 {memberTaskOnly && (
                   <p className="confirm-copy">
                     {tr(
-                      "En tant que membre, vous ne pouvez ajouter que le lien livrable de « {name} ».",
+                      "En tant que membre, vous ne pouvez modifier que le lien livrable et le statut de « {name} ».",
                       { name: modal?.record?.name ?? "" },
                     )}
                   </p>
+                )}
+                {memberTaskOnly && (
+                  <label className="form-field">
+                    <span>{tr("Statut")}</span>
+                    <Pick
+                      label={tr("Statut")}
+                      value={form.status || "À faire"}
+                      onChange={(v) => set("status", v || "À faire")}
+                      items={[
+                        ...new Set([form.status || "À faire", "En cours", "À valider"]),
+                      ]}
+                    />
+                  </label>
                 )}
                 {!memberTaskOnly && (
                   <label className="form-field title-field">
@@ -3658,9 +3685,7 @@ export default function Tracker() {
                           label={tr("Statut")}
                           value={form.status || "À faire"}
                           onChange={(v) => set("status", v || "À faire")}
-                          items={statuses.filter(
-                            (s) => s !== "À valider" || form.status === "À valider",
-                          )}
+                          items={[...statuses]}
                         />
                       </label>
                     </div>
@@ -3826,19 +3851,21 @@ export default function Tracker() {
                     </label>
                   </>
                 )}
-                <label className="form-field">
-                  <span>
-                    {tr(modal?.type === "client" ? "Brief" : "Description")}
-                  </span>
-                  <textarea
-                    rows={4}
-                    maxLength={15000}
-                    value={form.description || ""}
-                    onChange={(e) => set("description", e.target.value)}
-                    placeholder={tr("Objectifs, références et consignes…")}
-                  />
-                </label>
-                {modal?.type === "task" && (
+                {!memberTaskOnly && (
+                  <label className="form-field">
+                    <span>
+                      {tr(modal?.type === "client" ? "Brief" : "Description")}
+                    </span>
+                    <textarea
+                      rows={4}
+                      maxLength={15000}
+                      value={form.description || ""}
+                      onChange={(e) => set("description", e.target.value)}
+                      placeholder={tr("Objectifs, références et consignes…")}
+                    />
+                  </label>
+                )}
+                {modal?.type === "task" && !memberTaskOnly && (
                   <details>
                     <summary>
                       {tr("Publication sur les réseaux sociaux")}
