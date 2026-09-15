@@ -33,6 +33,12 @@ ok(!gates.some((g) => g.late), 'nothing late two weeks out');
 const late = gatesFor(task({ due: '2026-09-16', status: 'En cours' }), today);
 ok(late.find((g) => g.key === 'send').late && late.find((g) => g.key === 'validation').late, 'send and validation gates are late two days before publishing');
 eq(gatesFor(task(), today), [], 'no due, no gates');
+eq(gatesFor(task({ due: '2026-09-28', publishable: false }), today), [], 'internal work has no gates');
+ok(!isEvergreenReserve(task({ status: 'Validé', evergreen: true, publishable: false })), 'internal work is never evergreen reserve');
+{
+  const internal = sweep([client, project, task({ id: 'copy', status: 'En cours', due: shiftDay(dayIn(new Date('2026-09-16T11:00:00.000Z')), 1), publishable: false })], new Date('2026-09-16T11:00:00.000Z'));
+  eq(internal.events, [], 'no J−1 / J−7 alerts for internal work');
+}
 
 // J−7 lock: only future dates inside the window, only when the date actually moves.
 ok(insideLock('2026-09-20', today) && insideLock(today, today) && !insideLock('2026-09-21', today), 'window is today … J−7 exclusive');

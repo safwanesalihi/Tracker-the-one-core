@@ -52,6 +52,9 @@ export function courtOf(task: Pick<RecordItem, 'status' | 'publishedAt' | 'archi
 }
 export const courtLabels: Record<Court, string> = { studio: 'Studio', client: 'Client', done: 'Terminé' };
 
+/** Internal work (copywriting, prémontage…) is never published: no gates, no lock, no editorial plan. */
+export const isPublishable = (task: Pick<RecordItem, 'publishable'>) => task.publishable !== false;
+
 export function approvalDueAt(sentAt: string) {
   return new Date(new Date(sentAt).getTime() + flow.validationHours * 3600 * 1000).toISOString();
 }
@@ -67,8 +70,8 @@ export function revisionState(task: Pick<RecordItem, 'revisionRound'>) {
 
 export type Gate = { key: GateKey; label: string; day: string; reached: boolean; late: boolean };
 /** The four backward gates for a publish date, with whether the task has passed each one. */
-export function gatesFor(task: Pick<RecordItem, 'due' | 'status' | 'sentAt' | 'validatedAt' | 'publishedAt' | 'deliverable' | 'description'>, today: string): Gate[] {
-  if (!isDay(task.due)) return [];
+export function gatesFor(task: Pick<RecordItem, 'due' | 'status' | 'sentAt' | 'validatedAt' | 'publishedAt' | 'deliverable' | 'description' | 'publishable'>, today: string): Gate[] {
+  if (!isDay(task.due) || !isPublishable(task)) return [];
   const reached: Record<GateKey, boolean> = {
     brief: !!task.description?.trim() || task.status !== 'À faire',
     send: !!task.sentAt || task.status === 'À valider' || task.status === 'Validé',
@@ -94,7 +97,7 @@ export function lockApplies(previousDue: string | undefined, nextDue: string | u
 }
 
 export const isEvergreenReserve = (task: RecordItem) =>
-  task.kind === 'task' && !!task.evergreen && !task.archived && task.status === 'Validé' && !task.due && !task.publishedAt;
+  task.kind === 'task' && !!task.evergreen && isPublishable(task) && !task.archived && task.status === 'Validé' && !task.due && !task.publishedAt;
 
 // ---------- transitions ----------
 
@@ -165,7 +168,7 @@ export function sweep(records: RecordItem[], now: Date): SweepResult {
       }
     }
 
-    if (isDay(task.due) && !task.publishedAt) {
+    if (isDay(task.due) && !task.publishedAt && isPublishable(task)) {
       // J−1 sweep: anything publishing tomorrow that is not validated.
       if (task.due === tomorrow && task.status !== 'Validé') {
         events.push(event(`evt:${task.id}:j1:${task.due}`, 'sweep', `Balayage J−1 : « ${task.name} » se publie demain et n’est pas validé (${task.status}).`, task, 'studio', nowIso));

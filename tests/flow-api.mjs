@@ -109,6 +109,20 @@ const signed = find(approved, t.id);
 eq([signed.status, signed.signOff.mode, signed.signOff.by, signed.signOff.email, signed.signOff.round], ['Validé', 'explicit', 'Amina Contact', 'amina@client.test', 1]);
 await post({ action: 'approve', taskId: t.id }, 409);
 
+// Internal work: no lock, never published, deletable by managers only (with its comments and events).
+globalThis.testUser = owner;
+const internal = await post({ action: 'create', kind: 'task', data: { ...base, name: 'Copywriting', due: day(2), status: 'Validé', publishable: false } });
+ok(internal.records.find((r) => r.id === internal.id).publishable === false, 'internal task created inside the lock window without override');
+await post({ action: 'publish', taskId: internal.id }, 409);
+await post({ action: 'comment', taskId: internal.id, text: 'note' });
+globalThis.testUser = creative;
+await post({ action: 'delete', kind: 'task', id: internal.id, revision: 1 }, 403);
+globalThis.testUser = owner;
+await post({ action: 'delete', kind: 'task', id: internal.id, revision: 99 }, 409);
+const deleted = await post({ action: 'delete', kind: 'task', id: internal.id, revision: 1 });
+ok(!deleted.records.some((r) => r.id === internal.id || r.taskId === internal.id), 'task, its comments and events are gone');
+await post({ action: 'delete', kind: 'task', id: internal.id, revision: 1 }, 404);
+
 // Publish (studio only, validated only), then evergreen rules.
 globalThis.testUser = owner;
 await post({ action: 'publish', taskId: lifted.id }, 409);

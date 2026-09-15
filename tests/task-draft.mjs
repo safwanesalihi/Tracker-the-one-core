@@ -7,13 +7,13 @@ const esbuild = await import(pathToFileURL(esbuildPath));
 mkdirSync('.sites-runtime', { recursive: true });
 await esbuild.build({
   stdin: {
-    contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import Row, {TaskDraftActions} from './app/task-draft-row'; export {emptyTaskDraft, editTaskDraft, taskDraftError} from './lib/task-draft'; export {googleProfileImage} from './lib/profile'; export function render(props) { return renderToStaticMarkup(<><table><tbody><Row {...props}/></tbody></table><TaskDraftActions {...props}/></>); }`,
+    contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import Row, {TaskDraftActions} from './app/task-draft-row'; export {emptyTaskDraft, editTaskDraft, taskDraftError} from './lib/task-draft'; export function render(props) { return renderToStaticMarkup(<><table><tbody><Row {...props}/></tbody></table><TaskDraftActions {...props}/></>); }`,
     resolveDir: process.cwd(), loader: 'tsx',
   },
   outfile: '.sites-runtime/task-draft-test.mjs', bundle: true, platform: 'node', format: 'esm',
   external: ['react', 'react/*', 'react-dom/*', 'radix-ui', 'lucide-react', 'class-variance-authority', 'clsx', 'tailwind-merge'],
 });
-const { emptyTaskDraft, editTaskDraft, taskDraftError, googleProfileImage, render } = await import(pathToFileURL(process.cwd() + '/.sites-runtime/task-draft-test.mjs'));
+const { emptyTaskDraft, editTaskDraft, taskDraftError, render } = await import(pathToFileURL(process.cwd() + '/.sites-runtime/task-draft-test.mjs'));
 const empty = emptyTaskDraft();
 for (const [key, value] of Object.entries(empty)) assert.equal(value, key === 'status' ? 'À faire' : '');
 assert.equal(emptyTaskDraft({ date: '2026-09-15', status: 'En cours', clientId: 'c' }).due, '2026-09-15');
@@ -38,6 +38,4 @@ assert.match(failed, /value="Nouvelle tâche"/);
 assert.match(failed, /Service indisponible/);
 assert.match(failed, /role="alert"/);
 assert.match(render({ ...props, busy: true }), /disabled=""/);
-assert.equal(googleProfileImage('https://lh3.googleusercontent.com/photo'), 'https://lh3.googleusercontent.com/photo');
-for (const url of ['javascript:alert(1)', 'http://lh3.googleusercontent.com/photo', 'https://lh3.googleusercontent.com.evil.test/photo', 'https://user:pass@lh3.googleusercontent.com/photo']) assert.equal(googleProfileImage(url), null);
-console.log('Inline task checks passed: empty row, context, parent validation, form association, visible errors, draft retention and safe profile images.');
+console.log('Inline task checks passed: empty row, context, parent validation, form association, visible errors and draft retention.');

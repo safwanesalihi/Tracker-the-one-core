@@ -40,6 +40,7 @@ export const fields = z.object({
   logo: z.string().regex(/^$|^[0-9a-f-]{36}$/).optional(),
   banner: z.string().regex(/^$|^[0-9a-f-]{36}$/).optional(),
   evergreen: z.boolean().optional(),
+  publishable: z.boolean().optional(),
 });
 
 export const requestFields = z.object({

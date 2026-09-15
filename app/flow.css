@@ -210,3 +210,15 @@
 .portal-banner-image{height:160px;border-radius:12px;overflow:hidden;margin-bottom:22px}
 .portal-banner-image img{width:100%;height:100%;object-fit:cover;display:block}
 @media (max-width:700px){.client-banner{height:120px}.client-hero-mark{margin-left:16px}.client-mark-xl{width:68px;height:68px}}
+
+/* In-place status change + row actions */
+.status-pick{border:0!important;background:transparent!important;padding:0!important;height:auto!important;min-height:0!important;box-shadow:none!important;gap:4px}
+.status-pick>svg{width:12px!important;height:12px!important;opacity:.5}
+.status-pick:hover .status{filter:brightness(.96)}
+.row-actions{display:inline-flex;gap:2px;margin-left:auto;opacity:0;transition:opacity .15s}
+tr:hover .row-actions,.row-actions:focus-within{opacity:1}
+.row-actions .icon-button{width:28px;height:28px}
+.icon-button.danger:hover,.btn.ghost.danger:hover{color:#aa3d36;background:#fff1ef}
+.btn.primary.danger{background:#aa3d36;border-color:#8f302b;color:#fff}
+.btn.primary.danger:hover{background:#8f302b}
+.task-table td:last-child .inline{flex-wrap:nowrap}

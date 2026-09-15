@@ -385,6 +385,7 @@ export async function POST(req: Request) {
       if (!canWrite(workspace.role)) return response({ error: 'Votre rôle ne peut pas publier.' }, 403);
       const task = findTask(rowsNow, body.taskId);
       if (!task) return response({ error: 'Tâche introuvable.' }, 404);
+      if (task.publishable === false) return response({ error: 'Cette tâche est un travail interne, elle ne se publie pas.' }, 409);
       if (task.status !== 'Validé') return response({ error: 'Un contenu se publie une fois validé.' }, 409);
       if (task.publishedAt) return response({ error: 'Déjà publié.' }, 409);
       const day = typeof body.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.day) ? body.day : null;
@@ -424,6 +425,19 @@ export async function POST(req: Request) {
         'system', workspace.id, true));
       await batch(db, statements);
       return result({ id: task.id });
+    }
+
+    if (body.action === 'delete') {
+      if (!canManageMembers(workspace.role)) return response({ error: 'Seuls le propriétaire et les administrateurs peuvent supprimer une tâche.' }, 403);
+      const task = rowsNow.find((r) => r.id === body.id && r.kind === 'task');
+      if (!task) return response({ error: 'Tâche introuvable.' }, 404);
+      if (body.revision !== task.revision) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
+      // The task and everything hanging off it: comments, events. Nothing else references a task.
+      await batch(db, [
+        { text: "DELETE FROM records WHERE workspace_id = $1 AND kind IN ('comment', 'event') AND data->>'taskId' = $2", params: [workspace.id, task.id] },
+        { text: 'DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3', params: [workspace.id, task.id, task.revision] },
+      ]);
+      return result();
     }
 
     if (body.action === 'mark-read') {
@@ -499,7 +513,7 @@ export async function POST(req: Request) {
         return response({ error: 'Un contenu de réserve n’a pas de date de publication. Retirez la date ou sortez-le de la réserve.' }, 400);
       }
       // J−7 lock: the calendar is frozen one week out. Admins may lift it explicitly; the lift is recorded.
-      if (lockApplies(existing?.due, data.due, today)) {
+      if (data.publishable !== false && lockApplies(existing?.due, data.due, today)) {
         if (!canManageMembers(workspace.role)) {
           return response({ error: `Verrou J−${flow.lockDays} : cette date est trop proche. Demandez à un administrateur de lever le verrou.`, code: 'lock' }, 403);
         }

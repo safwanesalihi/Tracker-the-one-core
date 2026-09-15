@@ -51,6 +51,7 @@ export type RecordItem = {
   signOff?: SignOff;           // task: validation receipt
   publishedAt?: string;        // task: when the item actually went out
   evergreen?: boolean;         // task: undated reserve item
+  publishable?: boolean;       // task: false for internal work (copywriting, prémontage…) that is never published
   lockOverride?: boolean;      // task: created/re-dated inside J−7 by an admin
   reminders?: string[];        // task: reminder keys already emitted
   request?: { by: string; email?: string; at: string }; // task: came from the portal request form
