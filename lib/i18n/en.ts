@@ -243,6 +243,7 @@ export const en: Record<string, string> = {
   'Ajouter une photo': 'Add a photo',
   'S’applique immédiatement, sur cet appareil.': 'Applies immediately, on this device.',
   'Image introuvable.': 'Image not found.',
+  'Actions': 'Actions',
   'Espace': 'Workspace',
   'Espace inconnu.': 'Unknown workspace.',
   'Exemple fictif · à remplacer avant utilisation réelle': 'Fictional example · replace before real use',

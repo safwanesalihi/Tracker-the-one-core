@@ -15,7 +15,7 @@
 .draft-error { color: #a43c2c; }
 .draft-actions { display: flex; gap: 8px; }
 .draft-actions .btn { font-size: 14px; }
-.task-table:has(.task-draft-row) { min-width: 1280px; }
+.task-table:has(.task-draft-row) { min-width: 1100px; }
 .task-table:has(.task-draft-row) th:nth-child(2) { width: 13%; }
 .task-table:has(.task-draft-row) th:nth-child(6) { width: 13%; }
 @media (max-width: 767px) {

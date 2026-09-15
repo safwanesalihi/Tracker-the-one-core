@@ -242,6 +242,7 @@ export const ar: Record<string, string> = {
   'Ajouter une photo': 'إضافة صورة',
   'S’applique immédiatement, sur cet appareil.': 'تُطبق فورًا على هذا الجهاز.',
   'Image introuvable.': 'الصورة غير موجودة.',
+  'Actions': 'إجراءات',
   'Espace': 'المساحة',
   'Espace inconnu.': 'مساحة غير معروفة.',
   'Exemple fictif · à remplacer avant utilisation réelle': 'مثال افتراضي · يُستبدل قبل الاستعمال الفعلي',

@@ -232,7 +232,7 @@
 .status-pick .status-caret{width:11px!important;height:11px!important;opacity:.55;margin-left:2px;display:inline!important;color:inherit!important}
 .status-pick:hover .status,.status-pick[data-state=open] .status{filter:brightness(.94);box-shadow:0 0 0 2px #fff,0 0 0 3px #d9dde3}
 .status-pick:disabled{cursor:not-allowed}
-.row-actions{display:inline-flex;gap:2px;margin-left:auto;opacity:0;transition:opacity .15s}
+.row-actions{display:inline-flex;gap:2px;opacity:.55;transition:opacity .15s}
 tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .row-actions .icon-button{width:28px;height:28px}
 .icon-button.danger:hover,.btn.ghost.danger:hover{color:#aa3d36;background:#fff1ef}
@@ -363,3 +363,12 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .user-row .user-profile .avatar{flex:none}
 .user-row .user-settings-icon{color:#737b88;flex:none;margin-inline-start:auto}
 .user-row .user-profile:hover .user-settings-icon{color:#fff}
+
+/* Task table: the actions stay reachable on the right whatever the width; secondary columns give way on narrower screens. */
+.task-table .actions-cell{position:sticky;right:0;background:#fff;padding-left:6px;padding-right:8px;text-align:right;box-shadow:-8px 0 8px -8px #16203822}
+.task-table tr:hover .actions-cell{background:#fafbfd}
+.task-table th.actions-cell{background:#fbfcfd;box-shadow:none}
+.task-table .actions-cell .row-actions{justify-content:flex-end}
+[dir=rtl] .task-table .actions-cell{right:auto;left:0;box-shadow:8px 0 8px -8px #16203822;text-align:left}
+@media (max-width:1360px){.task-table th:nth-child(8),.task-table td:nth-child(8){display:none}}
+@media (max-width:1180px){.task-table th:nth-child(7),.task-table td:nth-child(7){display:none}.task-table th:first-child{width:21%}.task-table th:nth-child(2){width:12%}.task-table th:nth-child(3){width:12%}.task-table th:nth-child(4){width:14%}.task-table th:nth-child(5){width:13%}.task-table th:nth-child(6){width:10%}}

@@ -43,6 +43,7 @@ export default function TaskDraftRow({ draft, clients, projects, members = [], b
       <TableCell><DatePicker label={t('Échéance de la nouvelle tâche')} value={draft.due} onChange={value => set('due', value)} /></TableCell>
       <TableCell><input form={formId} type="url" maxLength={2000} aria-label={t('Livrable de la nouvelle tâche')} placeholder="https://…" value={draft.deliverable} disabled={busy} onChange={e => set('deliverable', e.target.value)} /></TableCell>
       <TableCell><input form={formId} type="url" maxLength={2000} aria-label={t('Source de la nouvelle tâche')} placeholder="https://…" value={draft.source} disabled={busy} onChange={e => set('source', e.target.value)} /></TableCell>
+      <TableCell /><TableCell className="actions-cell" />
     </TableRow>;
 }
 
