@@ -1,6 +1,16 @@
 // Outgoing e-mail through Gmail SMTP (App Password). When not configured, callers fall back to showing the
 // information on screen so the studio can send it by hand.
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { env } from '@/lib/env';
+import { buildInvitePdf } from '@/lib/invite-pdf-core';
+
+/** The studio logo, read once and cached for every PDF the server generates this instance. */
+let logoBytesPromise: Promise<Uint8Array | null> | null = null;
+const logoBytes = () => {
+  logoBytesPromise ??= readFile(join(process.cwd(), 'public', 'the-one-core-logo-pdf.png')).catch(() => null);
+  return logoBytesPromise;
+};
 
 export const mailConfigured = () => !!(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
 
@@ -41,7 +51,16 @@ export async function sendInvitation(invitation: Invitation): Promise<{ sent: bo
     const { default: nodemailer } = await import('nodemailer');
     const transport = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: env.GMAIL_USER!, pass: env.GMAIL_APP_PASSWORD! } });
     const message = invitationMessage(invitation);
-    await transport.sendMail({ from: `"${invitation.studio}" <${env.GMAIL_USER}>`, to: invitation.to, subject: message.subject, text: message.text, html: message.html });
+    // Same welcome document as the "Download as PDF" button, attached so it arrives with the e-mail too.
+    const pdfBytes = await buildInvitePdf({
+      name: invitation.name, roleLabel: invitation.roleLabel, email: invitation.to,
+      temporaryPassword: invitation.temporaryPassword, url: invitation.url, studioName: invitation.studio,
+      logoPngBytes: await logoBytes(),
+    }).catch((error) => { console.error('invitation pdf', (error as Error).message); return null; });
+    await transport.sendMail({
+      from: `"${invitation.studio}" <${env.GMAIL_USER}>`, to: invitation.to, subject: message.subject, text: message.text, html: message.html,
+      ...(pdfBytes ? { attachments: [{ filename: `acces-${invitation.studio}.pdf`, content: Buffer.from(pdfBytes), contentType: 'application/pdf' }] } : {}),
+    });
     return { sent: true };
   } catch (error) {
     console.error('invitation mail', (error as Error).message);

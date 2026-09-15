@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Copy, KeyRound, Lock, Mail, MailCheck, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Copy, Download, KeyRound, Lock, Mail, MailCheck, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,7 @@ import Avatar from '@/app/profile-avatar';
 import { canManageMembers, invitableRoles, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type Invitation, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
 import type { RecordItem } from '@/lib/model';
 import { useI18n } from '@/app/locale-provider';
+import { buildInvitePdf, downloadPdf } from '@/lib/invite-pdf';
 
 type Props = {
   workspace: WorkspaceContext | null;
@@ -35,6 +36,9 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   const [invite, setInvite] = useState({ email: '', name: '', role: 'creative' as EditableRole, clientId: '' });
   const [inviteError, setInviteError] = useState('');
   const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [inviteContext, setInviteContext] = useState<{ name: string; role: EditableRole } | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState('');
   const [renewing, setRenewing] = useState<WorkspaceMember | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -63,10 +67,10 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   async function sendInvite(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current) return;
-    inFlight.current = true; setSaving(true); setInviteError(''); setInvitation(null);
+    inFlight.current = true; setSaving(true); setInviteError(''); setInvitation(null); setPdfError('');
     try {
       const result = await onChange({ action: 'invite-member', email: invite.email, name: invite.name, role: invite.role, ...(invite.role === 'client' ? { clientId: invite.clientId } : {}) });
-      if (result) setInvitation(result);
+      if (result) { setInvitation(result); setInviteContext({ name: invite.name, role: invite.role }); }
       setInvite({ email: '', name: '', role: 'creative', clientId: '' });
     } catch (error) {
       setInviteError(error instanceof Error ? t(error.message) : t('Invitation impossible. Réessayez.'));
@@ -74,15 +78,34 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   }
   async function renew() {
     if (!renewing || inFlight.current) return;
-    inFlight.current = true; setSaving(true); setSaveError(''); setInvitation(null);
+    inFlight.current = true; setSaving(true); setSaveError(''); setInvitation(null); setPdfError('');
     try {
       const result = await onChange({ action: 'renew-invitation', userId: renewing.userId });
-      if (result) setInvitation(result);
+      if (result) { setInvitation(result); setInviteContext({ name: memberName(renewing), role: renewing.role as EditableRole }); }
       setRenewing(null);
       document.getElementById('team-invite-title')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch (error) {
       setSaveError(error instanceof Error ? t(error.message) : t('Envoi impossible. Réessayez.'));
     } finally { inFlight.current = false; setSaving(false); }
+  }
+  async function downloadInvitePdf() {
+    if (!invitation?.temporaryPassword || !inviteContext) return;
+    setPdfBusy(true); setPdfError('');
+    try {
+      const bytes = await buildInvitePdf({
+        name: inviteContext.name || invitation.email,
+        // The PDF template itself is hardcoded French, so the role label stays in French
+        // too (not run through t()) regardless of the studio's own current UI language.
+        roleLabel: roleLabels[inviteContext.role],
+        email: invitation.email,
+        temporaryPassword: invitation.temporaryPassword,
+        url: window.location.origin,
+        studioName: workspace?.name || 'The One Core',
+      });
+      downloadPdf(bytes, `acces-${invitation.email}.pdf`);
+    } catch {
+      setPdfError(t('Génération du PDF impossible. Réessayez.'));
+    } finally { setPdfBusy(false); }
   }
   const when = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString(tag, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
   const clientName = (id?: string | null) => clients.find((c) => c.id === id)?.name || t('Client à préciser');
@@ -129,6 +152,8 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
             ? <><MailCheck size={18} /><div><strong>{t('Invitation envoyée à {email}', { email: invitation.email })}</strong><p>{t('Le mot de passe temporaire est dans l’e-mail. À sa première connexion, la personne choisira son mot de passe.')}</p></div></>
             : <><KeyRound size={18} /><div><strong>{t('Accès créé pour {email}', { email: invitation.email })}</strong>{invitation.error && <p className="form-error">{invitation.error}</p>}<p>{t('Transmettez ces informations à la personne (elle changera le mot de passe à sa première connexion) :')}</p>
               <dl><div><dt>{t('Adresse')}</dt><dd>{typeof window === 'undefined' ? '' : window.location.origin}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={async () => { try { await navigator.clipboard.writeText(invitation.temporaryPassword ?? ''); setCopyFeedback(t('Copié')); } catch { setCopyFeedback(t('Copie impossible. Sélectionnez le mot de passe pour le copier.')); } }}><Copy size={13} /></button>{copyFeedback && <small role="status">{copyFeedback}</small>}</dd></div></dl>
+              <button type="button" className="btn" disabled={pdfBusy} onClick={downloadInvitePdf}><Download size={14} />{pdfBusy ? t('Génération…') : t('Télécharger en PDF')}</button>
+              {pdfError && <p className="form-error" role="alert">{pdfError}</p>}
               <p>{t('Il n’est affiché qu’une fois. Pour en générer un autre : « Renvoyer » sur la ligne du membre.')}</p></div></>}
           <button type="button" className="icon-button" aria-label={t('Fermer')} onClick={() => setInvitation(null)}>{t('×')}</button>
         </div>}

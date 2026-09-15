@@ -223,6 +223,33 @@ export async function POST(req: Request) {
       return db.query(statement.text, statement.params);
     };
 
+    // A client-portal member's profile picture always mirrors their client's logo. The logo's
+    // bytes are copied into a fresh 'avatar' asset per member rather than shared, so replacing or
+    // clearing the client's logo later (which drops that old asset) never orphans a member's avatar.
+    const syncMemberAvatar = async (userId: string, logoAssetId: string | null | undefined) => {
+      const current = (await db.query<{ avatar: string | null }>('SELECT avatar FROM users WHERE id = $1', [userId]))[0];
+      let avatarId: string | null = null;
+      if (logoAssetId) {
+        avatarId = crypto.randomUUID();
+        const inserted = await db.query(
+          `INSERT INTO assets (id, workspace_id, kind, content_type, size, bytes, created_by)
+           SELECT $1, workspace_id, 'avatar', content_type, size, bytes, created_by FROM assets WHERE id = $2
+           RETURNING id`,
+          [avatarId, logoAssetId],
+        );
+        if (!inserted.length) avatarId = null;
+      }
+      await db.query('UPDATE users SET avatar = $2 WHERE id = $1', [userId, avatarId]);
+      if (current?.avatar) await db.query('DELETE FROM assets WHERE id = $1 AND workspace_id = $2 AND kind = $3', [current.avatar, workspace.id, 'avatar']);
+    };
+    const syncClientAvatars = async (clientId: string, logoAssetId: string | null | undefined) => {
+      const linked = await db.query<{ userId: string }>(
+        'SELECT user_id AS "userId" FROM workspace_members WHERE workspace_id = $1 AND role = $2 AND client_id = $3',
+        [workspace.id, 'client', clientId],
+      );
+      for (const { userId } of linked) await syncMemberAvatar(userId, logoAssetId);
+    };
+
     // ----- membership -----
 
     const studioName = workspace.name;
@@ -239,10 +266,12 @@ export async function POST(req: Request) {
       const { email, role, name } = parsed.data;
       if (isOwnerEmail(email)) return response({ error: 'Cette adresse est celle du propriétaire.' }, 400);
       let clientId: string | null = null;
+      let clientLogo: string | undefined;
       if (role === 'client') {
         const client = rowsNow.find((r) => r.kind === 'client' && r.id === parsed.data.clientId && !r.archived);
         if (!client) return response({ error: 'Choisissez un client actif pour cet accès portail.' }, 400);
         clientId = client.id;
+        clientLogo = client.logo;
       }
       const duplicate = await one<{ userId: string }>(
         'SELECT user_id AS "userId" FROM workspace_members WHERE workspace_id = $1 AND lower(email) = $2', [workspace.id, email],
@@ -254,6 +283,7 @@ export async function POST(req: Request) {
          ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, client_id = EXCLUDED.client_id, name = COALESCE(EXCLUDED.name, workspace_members.name)`,
         [workspace.id, account.userId, role, name || null, email, clientId, now],
       );
+      if (role === 'client' && clientLogo) await syncMemberAvatar(account.userId, clientLogo);
       const invitation = await deliver(email, name ?? '', roleLabels[role], account.temporaryPassword, false);
       return response({ workspace, members: await members(workspace.id, true), invitation });
     }
@@ -280,10 +310,12 @@ export async function POST(req: Request) {
       }
       if (!isWorkspaceRole(body.expectedRole)) return response({ error: 'Actualisez la liste des membres avant de réessayer.' }, 400);
       let clientId: string | null = null;
+      let clientLogo: string | undefined;
       if (body.action === 'set-member-role' && body.role === 'client') {
         const client = rowsNow.find((r) => r.kind === 'client' && r.id === body.clientId && !r.archived);
         if (!client) return response({ error: 'Choisissez un client actif pour cet accès portail.' }, 400);
         clientId = client.id;
+        clientLogo = client.logo;
       }
       const existing = await one<Pick<WorkspaceMember, 'role'>>(
         'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [workspace.id, body.userId],
@@ -300,6 +332,7 @@ export async function POST(req: Request) {
         ? await db.query(`UPDATE workspace_members SET role = $5, client_id = $6 WHERE ${condition} RETURNING user_id`, [...values, body.role, clientId])
         : await db.query(`DELETE FROM workspace_members WHERE ${condition} RETURNING user_id`, values);
       if (!changed.length) return response({ error: 'Les accès ont changé. Actualisez la liste avant de réessayer.' }, 409);
+      if (body.action === 'set-member-role' && body.role === 'client' && clientLogo) await syncMemberAvatar(body.userId, clientLogo);
       const refreshedWorkspace = await workspaceFor(user, workspace.id);
       return response({ workspace: refreshedWorkspace, members: await members(workspace.id, true) });
     }
@@ -663,6 +696,8 @@ export async function POST(req: Request) {
     } else {
       await insert(item);
     }
+    // A client's logo change mirrors onto every client-portal member already tied to that client.
+    if (body.kind === 'client' && item.logo !== existing?.logo) await syncClientAvatars(item.id, item.logo);
     // Studio-wide events for the polling alerts panel: a new client, or a task handed to someone.
     // IDs are prefixed evt: (like every other event) so mark-read recognizes and can clear them.
     if (body.kind === 'client' && !existing) {
