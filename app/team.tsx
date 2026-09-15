@@ -115,8 +115,30 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
     (filter === 'all' || member.role === filter) &&
     `${member.name ?? ''} ${member.email ?? ''} ${member.userId}`.toLocaleLowerCase('fr').includes(search.trim().toLocaleLowerCase('fr')),
   );
+  // Client portal access lives in its own list, apart from the studio's internal team.
+  const visibleTeam = visible.filter((member) => member.role !== 'client');
+  const visibleClients = visible.filter((member) => member.role === 'client');
   const managers = members.filter((member) => canManageMembers(member.role)).length;
   const viewers = members.filter((member) => member.role === 'viewer').length;
+
+  const memberRow = (member: WorkspaceMember) => {
+    const name = memberName(member);
+    const own = member.userId === currentUserId;
+    const editable = allowed && member.role !== 'owner' && !own;
+    return <TableRow key={member.userId}>
+      <TableCell><div className="team-person"><Avatar name={name} avatar={member.avatar} /><div className="member-identity">
+        <strong>{name} {own && <span className="neutral-badge">{t('Vous')}</span>}{member.pending && <span className="neutral-badge"><Mail size={10} />{' '}{t('En attente de première connexion')}</span>}</strong>
+        <small>{member.role === 'client' ? t('Portail · {client}', { client: clientName(member.clientId) ?? '' }) : member.email || t(roleLabels[member.role])}{allowed && member.lastLoginAt ? t(' · dernière connexion {when}', { when: when(member.lastLoginAt) ?? '' }) : ''}</small>
+      </div></div></TableCell>
+      <TableCell><span className="team-role-label">{t(roleLabels[member.role])}</span></TableCell>
+      <TableCell className="team-date"><time dateTime={member.createdAt}>{new Date(member.createdAt).toLocaleDateString(tag, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</time></TableCell>
+      <TableCell><div className="team-member-actions">{editable ? <>
+        <button className="btn" disabled={disabled} aria-label={`Modifier le rôle de ${name}`} onClick={(event) => { opener.current = event.currentTarget; setRole(member.role as EditableRole); setRoleClient(member.clientId || ''); setSaveError(''); setEditing(member); }}>{t('Modifier')}</button>
+        <button className="btn" disabled={disabled} aria-label={`Renvoyer l’invitation à ${name}`} title={t('Nouveau mot de passe temporaire')} onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRenewing(member); }}><Mail size={14} />{member.pending ? 'Renvoyer' : 'Réinitialiser'}</button>
+        <button className="icon-button team-remove" disabled={disabled} aria-label={`Retirer ${name} de l’espace`} onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRemoving(member); }}><Trash2 size={16} /></button>
+      </> : <span className="team-access-note"><Lock size={13} />{member.role === 'owner' ? t('Protégé') : own ? t('Votre accès') : t('Consultation')}</span>}</div></TableCell>
+    </TableRow>;
+  };
 
   return <div className="team-page">
     <div className="page-heading">
@@ -160,36 +182,28 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       </section>}
       <section className="team-card" aria-labelledby="team-members-title">
         <div className="section-head team-toolbar">
-          <div><h2 id="team-members-title" tabIndex={-1}>{t('Membres de l’équipe')}{' '}<span className="neutral-badge">{members.length}</span></h2><p>{t('Votre rôle :')}{' '}{t(roleLabels[workspace.role])}</p></div>
+          <div><h2 id="team-members-title" tabIndex={-1}>{t('Membres de l’équipe')}{' '}<span className="neutral-badge">{visibleTeam.length}</span></h2><p>{t('Votre rôle :')}{' '}{t(roleLabels[workspace.role])}</p></div>
           <div className="team-filters">
             <label className="search-input"><Search size={15} /><input aria-label={t('Rechercher un membre')} placeholder={t('Nom ou e-mail…')} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger aria-label={t('Filtrer les membres par rôle')} className="pick"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="all">{t('Tous les rôles')}</SelectItem>{workspaceRoles.map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="all">{t('Tous les rôles')}</SelectItem>{workspaceRoles.filter((value) => value !== 'client').map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
-        {visible.length ? <Table className="team-members-table">
+        {visibleTeam.length ? <Table className="team-members-table">
           <TableHeader><TableRow><TableHead>{t('Membre')}</TableHead><TableHead>{t('Rôle')}</TableHead><TableHead className="team-date">{t('Depuis le')}</TableHead><TableHead className="team-actions-heading">{t('Accès')}</TableHead></TableRow></TableHeader>
-          <TableBody>{visible.map((member) => {
-            const name = memberName(member);
-            const own = member.userId === currentUserId;
-            const editable = allowed && member.role !== 'owner' && !own;
-            return <TableRow key={member.userId}>
-              <TableCell><div className="team-person"><Avatar name={name} avatar={member.avatar} /><div className="member-identity">
-                <strong>{name} {own && <span className="neutral-badge">{t('Vous')}</span>}{member.pending && <span className="neutral-badge"><Mail size={10} />{' '}{t('En attente de première connexion')}</span>}</strong>
-                <small>{member.role === 'client' ? t('Portail · {client}', { client: clientName(member.clientId) ?? '' }) : member.email || t(roleLabels[member.role])}{allowed && member.lastLoginAt ? t(' · dernière connexion {when}', { when: when(member.lastLoginAt) ?? '' }) : ''}</small>
-              </div></div></TableCell>
-              <TableCell><span className="team-role-label">{t(roleLabels[member.role])}</span></TableCell>
-              <TableCell className="team-date"><time dateTime={member.createdAt}>{new Date(member.createdAt).toLocaleDateString(tag, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</time></TableCell>
-              <TableCell><div className="team-member-actions">{editable ? <>
-                <button className="btn" disabled={disabled} aria-label={`Modifier le rôle de ${name}`} onClick={(event) => { opener.current = event.currentTarget; setRole(member.role as EditableRole); setRoleClient(member.clientId || ''); setSaveError(''); setEditing(member); }}>{t('Modifier')}</button>
-                <button className="btn" disabled={disabled} aria-label={`Renvoyer l’invitation à ${name}`} title={t('Nouveau mot de passe temporaire')} onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRenewing(member); }}><Mail size={14} />{member.pending ? 'Renvoyer' : 'Réinitialiser'}</button>
-                <button className="icon-button team-remove" disabled={disabled} aria-label={`Retirer ${name} de l’espace`} onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRemoving(member); }}><Trash2 size={16} /></button>
-              </> : <span className="team-access-note"><Lock size={13} />{member.role === 'owner' ? t('Protégé') : own ? t('Votre accès') : t('Consultation')}</span>}</div></TableCell>
-            </TableRow>;
-          })}</TableBody>
-        </Table> : <Empty><EmptyHeader><Users size={24} /><EmptyTitle>{members.length ? 'Aucun résultat' : 'Aucun membre disponible'}</EmptyTitle><EmptyDescription>{members.length ? 'Essayez un autre nom ou un autre rôle.' : 'Actualisez pour recharger les membres de cet espace.'}</EmptyDescription></EmptyHeader>{members.length > 0 && <button className="btn" onClick={() => { setSearch(''); setFilter('all'); }}>{t('Effacer les filtres')}</button>}</Empty>}
+          <TableBody>{visibleTeam.map(memberRow)}</TableBody>
+        </Table> : <Empty><EmptyHeader><Users size={24} /><EmptyTitle>{members.some((m) => m.role !== 'client') ? 'Aucun résultat' : 'Aucun membre disponible'}</EmptyTitle><EmptyDescription>{members.some((m) => m.role !== 'client') ? 'Essayez un autre nom ou un autre rôle.' : 'Actualisez pour recharger les membres de cet espace.'}</EmptyDescription></EmptyHeader>{members.some((m) => m.role !== 'client') && <button className="btn" onClick={() => { setSearch(''); setFilter('all'); }}>{t('Effacer les filtres')}</button>}</Empty>}
+      </section>
+      <section className="team-card" aria-labelledby="team-clients-title">
+        <div className="section-head team-toolbar">
+          <div><h2 id="team-clients-title" tabIndex={-1}>{t('Clients')}{' '}<span className="neutral-badge">{visibleClients.length}</span></h2><p>{t('Accès portail, un contact par client.')}</p></div>
+        </div>
+        {visibleClients.length ? <Table className="team-members-table">
+          <TableHeader><TableRow><TableHead>{t('Membre')}</TableHead><TableHead>{t('Rôle')}</TableHead><TableHead className="team-date">{t('Depuis le')}</TableHead><TableHead className="team-actions-heading">{t('Accès')}</TableHead></TableRow></TableHeader>
+          <TableBody>{visibleClients.map(memberRow)}</TableBody>
+        </Table> : <Empty><EmptyHeader><Users size={24} /><EmptyTitle>{members.some((m) => m.role === 'client') ? 'Aucun résultat' : 'Aucun accès client'}</EmptyTitle><EmptyDescription>{members.some((m) => m.role === 'client') ? 'Essayez un autre nom.' : 'Invitez un contact client ci-dessus pour lui ouvrir le portail.'}</EmptyDescription></EmptyHeader>{members.some((m) => m.role === 'client') && <button className="btn" onClick={() => setSearch('')}>{t('Effacer la recherche')}</button>}</Empty>}
       </section>
       <div className="team-lower">
         <section><h2>{t('Qui peut faire quoi ?')}</h2><p>{t('Les accès sont vérifiés à chaque action.')}</p>
