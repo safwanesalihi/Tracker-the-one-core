@@ -446,7 +446,8 @@ export async function POST(req: Request) {
         ? rows.find((record) => record.id === body.id && record.kind === body.kind)
         : undefined;
     if (body.action === 'update' && !existing) return response({ error: 'Élément introuvable.' }, 404);
-    // A member edits only the tasks within their reach; clients and sub-projects are shared work.
+    // A member edits only the tasks within their reach; tasks are created by owners and admins. Clients and sub-projects are shared work.
+    if (workspace.role === 'creative' && body.kind === 'task' && !existing) return response({ error: 'Les tâches sont créées par le propriétaire ou un administrateur.' }, 403);
     if (workspace.role === 'creative' && existing?.kind === 'task' && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
 
     const parsed = fields.safeParse(body.data);

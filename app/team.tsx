@@ -80,7 +80,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
     <div className="page-heading">
       <span className="page-symbol" aria-hidden="true"><Users size={22} /></span>
       <div className="heading-line"><h1>Équipe</h1><button className="btn" onClick={onRefresh} disabled={disabled}><RefreshCw size={15} />Actualiser</button></div>
-      <p>Les personnes qui font avancer vos projets.</p>
+      <p>{allowed ? 'Les personnes qui font avancer vos projets.' : 'Les personnes qui font avancer les projets du studio. La gestion des accès est réservée au propriétaire et aux administrateurs.'}</p>
     </div>
     {!workspace ? <Empty className="team-card">
       <EmptyHeader><Lock size={24} /><EmptyTitle>Connectez votre espace</EmptyTitle>
