@@ -71,8 +71,10 @@ export default function Login() {
   return <div className="auth-screen">
     <div className="auth-form google-login">
       <img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" />
-      <h1>Bienvenue dans the one core<span className="wordmark-dot">.</span></h1>
-      <p>Retrouvez vos clients, votre équipe et chaque livrable dans votre espace.</p>
+      <h1>{mode === 'sign-up' ? 'Première connexion' : 'Bienvenue'}<span className="wordmark-dot">.</span></h1>
+      <p>{mode === 'sign-up'
+        ? 'Créez votre accès avec le code d’invitation transmis par The One Core.'
+        : 'L’espace de suivi et de validation de The One Core — pour l’équipe comme pour ses clients.'}</p>
 
       <form className="auth-password" onSubmit={submitPassword} aria-label={mode === 'sign-up' ? 'Créer un compte' : 'Se connecter'}>
         <div className="auth-mode" role="tablist">
@@ -97,7 +99,7 @@ export default function Login() {
         {googleBusy || !ready ? <Loader2 size={20} className="spin" /> : <img src="/google-g.png" width={20} height={20} alt="" />}
         {googleBusy ? 'Redirection…' : 'Continuer avec Google'}
       </button>
-      <p className="google-login-note">Première connexion sur invitation : saisissez le code fourni par le studio ci-dessus, puis continuez avec Google ou créez un mot de passe. Ensuite, Google ou e-mail + mot de passe suffisent.</p>
+      <p className="google-login-note">Accès sur invitation. À la première connexion, saisissez le code reçu du studio puis continuez avec Google ou créez un mot de passe ; ensuite, Google ou e-mail + mot de passe suffisent.</p>
       {configured?.google === false && ready && <div className="auth-setup" role="status"><strong>Configuration Google requise</strong><p>Le bouton Google sera disponible lorsque les identifiants Google de l’application auront été ajoutés.</p><button type="button" className="text-link" onClick={() => { setError(''); setConfigured(null); void checkConfiguration(); }}>Vérifier à nouveau</button></div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <small className="auth-privacy"><Lock size={14} />Vos données restent privées. Les mots de passe sont stockés hachés et jamais en clair.</small>
