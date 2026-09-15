@@ -16,7 +16,8 @@ type Status = { google: boolean; password: boolean } | null;
 
 export default function Login() {
   const [configured, setConfigured] = useState<Status>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);          // password form
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [form, setForm] = useState({ email: '', password: '', name: '', inviteCode: '' });
@@ -41,9 +42,9 @@ export default function Login() {
   async function signInWithGoogle() {
     if (starting.current) return;
     starting.current = true;
-    setBusy(true); setError('');
+    setGoogleBusy(true); setError('');
     try { await startGoogleSignIn(); }
-    catch (error) { setError((error as Error).message); setBusy(false); starting.current = false; }
+    catch (error) { setError((error as Error).message); setGoogleBusy(false); starting.current = false; }
   }
 
   async function submitPassword(event: React.FormEvent) {
@@ -58,7 +59,9 @@ export default function Login() {
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || 'Connexion impossible. Réessayez.');
-      window.location.assign('/#home');
+      // The session cookie is set; reload so the app fetches the workspace (a hash change alone would not).
+      window.location.hash = '#home';
+      window.location.reload();
     } catch (error) { setError((error as Error).message); setBusy(false); }
   }
 
@@ -80,7 +83,7 @@ export default function Login() {
         {withCode
           ? <label><span>Code d’invitation</span><input maxLength={20} autoComplete="off" value={form.inviteCode} onChange={set('inviteCode')} placeholder="ABCD-EFGH" style={{ textTransform: 'uppercase' }} /></label>
           : <button type="button" className="text-link auth-code-toggle" onClick={() => setWithCode(true)}>J’ai un code d’invitation</button>}
-        <button className="btn primary auth-submit" disabled={!ready || !configured?.password || busy}>
+        <button className="btn primary auth-submit" disabled={!ready || !configured?.password || busy || googleBusy}>
           {busy ? <Loader2 size={18} className="spin" /> : <Lock size={16} />}
           {mode === 'sign-up' ? 'Créer mon compte' : 'Se connecter'}
         </button>
@@ -88,9 +91,9 @@ export default function Login() {
 
       <div className="auth-divider"><span>ou</span></div>
 
-      <button type="button" className="btn google-btn" disabled={!configured?.google || busy} onClick={signInWithGoogle}>
-        {busy || !ready ? <Loader2 size={20} className="spin" /> : <img src="/google-g.png" width={20} height={20} alt="" />}
-        {busy ? 'Redirection…' : 'Continuer avec Google'}
+      <button type="button" className="btn google-btn" disabled={!configured?.google || busy || googleBusy} onClick={signInWithGoogle}>
+        {googleBusy || !ready ? <Loader2 size={20} className="spin" /> : <img src="/google-g.png" width={20} height={20} alt="" />}
+        {googleBusy ? 'Redirection…' : 'Continuer avec Google'}
       </button>
       <p className="google-login-note">Avec Google, aucun mot de passe n’est enregistré par The One Core. Un compte avec mot de passe est lié à son adresse e-mail : les invitations se rejoignent avec le code fourni par le studio.</p>
       {configured?.google === false && ready && <div className="auth-setup" role="status"><strong>Configuration Google requise</strong><p>Le bouton Google sera disponible lorsque les identifiants Google de l’application auront été ajoutés.</p><button type="button" className="text-link" onClick={() => { setError(''); setConfigured(null); void checkConfiguration(); }}>Vérifier à nouveau</button></div>}
