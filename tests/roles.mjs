@@ -81,9 +81,12 @@ as(owner);
 const mine = await t('Story pour Yasmine', c1.id, p1.id, 'Yasmine Creative');
 as(yasmine);
 ok((await get()).records.some((r) => r.id === mine.id), 'tasks are created by the owner and assigned to members');
-const newClient = await post({ action: 'create', kind: 'client', data: { name: 'Client créé par un membre', quota: '4' } });
+await post({ action: 'create', kind: 'client', data: { name: 'Client créé par un membre', quota: '4' } }, 403);
+as(owner);
+const newClient = await post({ action: 'create', kind: 'client', data: { name: 'Client créé par le propriétaire', quota: '4' } });
+as(yasmine);
 const newProject = await post({ action: 'create', kind: 'project', data: { name: 'Sous-projet créé par un membre', clientId: newClient.id } });
-ok(newProject.records.some((r) => r.id === newProject.id), 'members create clients and sub-projects');
+ok(newProject.records.some((r) => r.id === newProject.id), 'members can still create sub-projects for existing clients');
 await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client créé par un membre', archived: true } }, 403);
 await post({ action: 'invite-member', email: 'z@z.test', role: 'creative' }, 403);
 await post({ action: 'demo' }, 403);
@@ -91,6 +94,8 @@ await post({ action: 'request', clientId: c1.id, data: { name: 'Demande' } }, 40
 const sent = await post({ action: 'update', kind: 'task', id: ty1.id, revision: 1, data: { name: 'Reel Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'À valider', due: '2026-12-01', deliverable: 'https://x.test/y1.mp4' } });
 ok(sent.records.find((r) => r.id === ty1.id).approvalDueAt, 'a member can send their own work to the client');
 await post({ action: 'comment', taskId: ty1.id, text: 'Envoyé !' });
+const awaiting = sent.records.find((r) => r.id === ty1.id);
+await post({ action: 'update', kind: 'task', id: ty1.id, revision: awaiting.revision, data: { ...awaiting, status: 'Validé' } }, 403);
 
 // Amine sees the mirror image.
 as(amine);
@@ -113,12 +118,28 @@ await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { na
 
 as(owner);
 eq(ids(await get(), 'task').length, 5, 'the owner sees everything');
-eq(ids(await get(), 'client').length, 3, 'including the member-created client');
+eq(ids(await get(), 'client').length, 3, 'only owner-created clients persist');
+// Every non-owner role is forbidden from adding clients, including through demo seeding.
+for (const role of ['admin', 'viewer', 'client']) {
+  await db.query('UPDATE workspace_members SET role = $1, client_id = $2 WHERE workspace_id = $3 AND user_id = $4', [role, role === 'client' ? c1.id : null, WS, amine.userId]);
+  as(amine);
+  await post({ action: 'create', kind: 'client', data: { name: 'Forbidden client' } }, 403);
+  await post({ action: 'demo' }, 403);
+}
+as(owner);
+eq(ids(await get(), 'client').length, 3, 'denied creations and demo calls persist no clients');
 // Anyone can rename their own profile; the roster and greeting data follow, e-mail stays.
 as(yasmine);
 await post({ action: 'update-profile', name: ' ' }, 400);
 const renamed = await post({ action: 'update-profile', name: '  Yasmine   Alaoui ' });
 eq([renamed.user.name, renamed.user.email], ['Yasmine Alaoui', 'yasmine@studio.test'], 'trimmed name returned with the payload');
+as({ ...yasmine, fullName: 'Yasmine Alaoui', displayName: 'Yasmine Alaoui' });
+const renamedView = await get();
+ok(renamedView.records.some((r) => r.id === ty1.id && r.assignee === 'Yasmine Alaoui'), 'renaming preserves task ownership');
+await post({ action: 'update-profile', name: 'Amine Creative' });
+as({ ...yasmine, fullName: 'Amine Creative', displayName: 'Amine Creative' });
+ok(!(await get()).records.some((r) => r.id === ta1.id), 'matching another member’s display name cannot take their tasks');
+await post({ action: 'update-profile', name: 'Yasmine Alaoui' });
 as(owner);
 eq((await get()).members.find((m) => m.userId === yasmine.userId).name, 'Yasmine Alaoui', 'roster reflects the new name');
 

@@ -21,6 +21,7 @@ export type RecordItem = {
   projectId?: string;
   taskId?: string;
   assignee?: string;
+  assigneeId?: string; // stable identity; display-name changes never alter access
   due?: string;
   source?: string;
   deliverable?: string;

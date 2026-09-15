@@ -250,7 +250,7 @@ export const statusOrder: readonly Status[] = ['À faire', 'En cours', 'À valid
 
 // ---------- what a client contact may see ----------
 
-const clientHiddenTaskFields = ['assignee', 'source', 'lockOverride', 'reminders', 'demo'] as const;
+const clientHiddenTaskFields = ['assignee', 'assigneeId', 'source', 'lockOverride', 'reminders', 'demo'] as const;
 
 /** The portal slice of a workspace: one client, its projects, tasks, comments and client-facing events. */
 export function portalView(records: RecordItem[], clientId: string): RecordItem[] {
@@ -272,9 +272,9 @@ export function portalView(records: RecordItem[], clientId: string): RecordItem[
 // ---------- what a creative (member) may see ----------
 
 /** A member sees every client and project, plus the tasks assigned to them and the unassigned ones they can pick up. */
-export function memberView(records: RecordItem[], identities: string[]): RecordItem[] {
+export function memberView(records: RecordItem[], identities: string[], userId?: string): RecordItem[] {
   const mine = new Set(identities.map((v) => v.trim().toLowerCase()).filter(Boolean));
-  const visible = (task: RecordItem) => !task.assignee?.trim() || mine.has(task.assignee.trim().toLowerCase());
+  const visible = (task: RecordItem) => !task.assignee?.trim() || (task.assigneeId ? task.assigneeId === userId : mine.has(task.assignee.trim().toLowerCase()));
   const clients = records.filter((r) => r.kind === 'client');
   const projects = records.filter((r) => r.kind === 'project');
   const tasks = records.filter((r) => r.kind === 'task' && visible(r));

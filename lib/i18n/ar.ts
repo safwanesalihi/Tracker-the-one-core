@@ -1,5 +1,11 @@
 // Arabic (Morocco). Keys are the French source strings (see lib/i18n/index.ts).
 export const ar: Record<string, string> = {
+  "Gère les clients existants, projets, tâches, archivage, verrou J−7, pilotage et invitations. La création de clients est réservée au propriétaire.": "يدير العملاء الحاليين والمشاريع والمهام والأرشفة وقفل ي−7 والقيادة والدعوات. إنشاء العملاء مخصص للمالك.",
+  "Fait avancer ses tâches ou celles à prendre, commente, modifie les clients existants et gère les sous-projets. Équipe en lecture seule. Ni création de clients ou de tâches, ni validation client, ni archivage, ni pilotage.": "ينجز المهام المسندة إليه أو المتاحة ويعلق ويعدل العملاء الحاليين ويدير المشاريع الفرعية. الفريق للقراءة فقط. لا ينشئ عملاء أو مهام ولا يعتمد نيابة عن العميل ولا يؤرشف ولا يصل إلى القيادة.",
+  "Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.": "فقط العميل أو المالك أو المدير يمكنه اعتماد التسليم.",
+  "Copié": "تم النسخ",
+  "Copie impossible. Sélectionnez le mot de passe pour le copier.": "تعذر النسخ. حدد كلمة المرور وانسخها يدوياً.",
+  'Seul le propriétaire peut ajouter des clients.': 'المالك وحده يمكنه إضافة العملاء.',
   ' Vous pouvez les modifier ou les archiver.': ' يمكنكم تعديلها أو أرشفتها.',
   ' h et ': ' س و ',
   ' puis ': ' ثم ',

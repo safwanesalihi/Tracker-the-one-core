@@ -25,6 +25,7 @@ type Props = {
 
 export default function TeamPage({ workspace, members, clients = [], currentUserId, busy, mailConfigured = false, onChange, onRefresh }: Props) {
   const { t, tag } = useI18n();
+  const [copyFeedback, setCopyFeedback] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [editing, setEditing] = useState<WorkspaceMember | null>(null);
@@ -127,7 +128,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           {invitation.sent
             ? <><MailCheck size={18} /><div><strong>{t('Invitation envoyée à {email}', { email: invitation.email })}</strong><p>{t('Le mot de passe temporaire est dans l’e-mail. À sa première connexion, la personne choisira son mot de passe.')}</p></div></>
             : <><KeyRound size={18} /><div><strong>{t('Accès créé pour {email}', { email: invitation.email })}</strong>{invitation.error && <p className="form-error">{invitation.error}</p>}<p>{t('Transmettez ces informations à la personne (elle changera le mot de passe à sa première connexion) :')}</p>
-              <dl><div><dt>{t('Adresse')}</dt><dd>{typeof window === 'undefined' ? '' : window.location.origin}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={() => { void navigator.clipboard?.writeText(invitation.temporaryPassword ?? ''); }}><Copy size={13} /></button></dd></div></dl>
+              <dl><div><dt>{t('Adresse')}</dt><dd>{typeof window === 'undefined' ? '' : window.location.origin}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={async () => { try { await navigator.clipboard.writeText(invitation.temporaryPassword ?? ''); setCopyFeedback(t('Copié')); } catch { setCopyFeedback(t('Copie impossible. Sélectionnez le mot de passe pour le copier.')); } }}><Copy size={13} /></button>{copyFeedback && <small role="status">{copyFeedback}</small>}</dd></div></dl>
               <p>{t('Il n’est affiché qu’une fois. Pour en générer un autre : « Renvoyer » sur la ligne du membre.')}</p></div></>}
           <button type="button" className="icon-button" aria-label={t('Fermer')} onClick={() => setInvitation(null)}>{t('×')}</button>
         </div>}
@@ -180,7 +181,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           {role === 'client' && <label className="form-field"><span>{t('Client')}</span><Select value={roleClient || '__none'} disabled={disabled} onValueChange={(value) => setRoleClient(value === '__none' ? '' : value)}><SelectTrigger className="pick" aria-label={t('Client')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{t('Choisir un client')}</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <p className="team-role-description">{t(roleDescriptions[role])}</p>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}
-          <DialogFooter className="modal-footer"><button className="btn" type="button" disabled={saving} onClick={() => setEditing(null)}>{t('Annuler')}</button><button className="btn primary" disabled={disabled || !allowed || (role === editing?.role && roleClient === (editing?.clientId || '')) || (role === 'client' && !roleClient)}>{saving ? 'Enregistrement…' : 'Enregistrer le rôle'}</button></DialogFooter>
+          <DialogFooter className="modal-footer"><button className="btn" type="button" disabled={saving} onClick={() => setEditing(null)}>{t('Annuler')}</button><button className="btn primary" disabled={disabled || !allowed || (role === editing?.role && roleClient === (editing?.clientId || '')) || (role === 'client' && !roleClient)}>{t(saving ? 'Enregistrement…' : 'Enregistrer le rôle')}</button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -188,14 +189,14 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <AlertDialogContent className="team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.focus(); }}>
         <AlertDialogHeader><AlertDialogTitle>{t(renewing?.pending ? 'Renvoyer l’invitation ?' : 'Réinitialiser le mot de passe ?')}</AlertDialogTitle><AlertDialogDescription>{t(mailConfigured ? '{name} recevra un nouveau mot de passe temporaire par e-mail. L’ancien mot de passe et ses sessions en cours cessent de fonctionner immédiatement.' : '{name} recevra un nouveau mot de passe temporaire (affiché ici, à transmettre). L’ancien mot de passe et ses sessions en cours cessent de fonctionner immédiatement.', { name: renewing ? memberName(renewing) : '' })}</AlertDialogDescription></AlertDialogHeader>
         {saveError && <p className="form-error" role="alert">{saveError}</p>}
-        <AlertDialogFooter><AlertDialogCancel disabled={saving}>{t('Annuler')}</AlertDialogCancel><AlertDialogAction disabled={disabled || !allowed} onClick={(event) => { event.preventDefault(); void renew(); }}>{saving ? t('Envoi…') : 'Confirmer'}</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogFooter><AlertDialogCancel disabled={saving}>{t('Annuler')}</AlertDialogCancel><AlertDialogAction disabled={disabled || !allowed} onClick={(event) => { event.preventDefault(); void renew(); }}>{t(saving ? 'Envoi…' : 'Confirmer')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
     <AlertDialog open={!!removing} onOpenChange={(open) => { if (!open && !saving) setRemoving(null); }}>
-      <AlertDialogContent className="team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.isConnected ? opener.current.focus() : document.getElementById('team-members-title')?.focus(); }}>
+      <AlertDialogContent className="team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); else document.getElementById('team-members-title')?.focus(); }}>
         <AlertDialogHeader><AlertDialogTitle>{t('Retirer l’accès à cet espace ?')}</AlertDialogTitle><AlertDialogDescription>{t('{name} ne pourra plus accéder aux clients, projets et tâches de cet espace. Ses contributions seront conservées. Rétablir cet accès nécessitera une nouvelle invitation.', { name: removing ? memberName(removing) : '' })}</AlertDialogDescription></AlertDialogHeader>
         {saveError && <p className="form-error" role="alert">{saveError}</p>}
-        <AlertDialogFooter><AlertDialogCancel disabled={saving}>{t('Annuler')}</AlertDialogCancel><AlertDialogAction className="team-confirm-remove" disabled={disabled || !allowed} onClick={(event) => { event.preventDefault(); if (removing) void save({ action: 'remove-member', userId: removing.userId, expectedRole: removing.role }); }}>{saving ? 'Retrait…' : 'Retirer l’accès'}</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogFooter><AlertDialogCancel disabled={saving}>{t('Annuler')}</AlertDialogCancel><AlertDialogAction className="team-confirm-remove" disabled={disabled || !allowed} onClick={(event) => { event.preventDefault(); if (removing) void save({ action: 'remove-member', userId: removing.userId, expectedRole: removing.role }); }}>{t(saving ? 'Retrait…' : 'Retirer l’accès')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </div>;

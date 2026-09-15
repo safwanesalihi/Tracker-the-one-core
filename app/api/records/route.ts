@@ -115,11 +115,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 const identitiesOf = (user: AppUser) => [user.fullName ?? '', user.displayName, user.email];
 // A member's reach: tasks assigned to them, or not assigned to anyone yet.
 const isMine = (user: AppUser, task: RecordItem) =>
-  !task.assignee?.trim() || identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase());
+  !task.assignee?.trim() || (task.assigneeId ? task.assigneeId === user.userId : identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase()));
 
 function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
   if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
-  if (workspace.role === 'creative') return memberView(rows, identitiesOf(user));
+  if (workspace.role === 'creative') return memberView(rows, identitiesOf(user), user.userId);
   return rows;
 }
 
@@ -143,7 +143,7 @@ function clientContextValid(workspace: WorkspaceContext, rows: RecordItem[]) {
   return !!workspace.clientId && rows.some((r) => r.kind === 'client' && r.id === workspace.clientId && !r.archived);
 }
 
-export async function GET(req?: Request) {
+export async function GET(req: Request) {
   try {
     const user = await identity(req);
     if (!user) return response({ error: 'Connectez-vous pour accéder à votre espace.' }, 401);
@@ -307,7 +307,7 @@ export async function POST(req: Request) {
     // ----- demo data -----
 
     if (body.action === 'demo') {
-      if (!canManageMembers(workspace.role)) return response({ error: 'Action réservée aux administrateurs.' }, 403);
+      if (workspace.role !== 'owner') return response({ error: 'Seul le propriétaire peut ajouter des clients.' }, 403);
       const marker = `${owner}:demo`;
       const demoRecords = sampleRecords().map((record) => ({
         ...record,
@@ -433,10 +433,13 @@ export async function POST(req: Request) {
       if (!task) return response({ error: 'Tâche introuvable.' }, 404);
       if (body.revision !== task.revision) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
       // The task and everything hanging off it: comments, events. Nothing else references a task.
-      await batch(db, [
-        { text: "DELETE FROM records WHERE workspace_id = $1 AND kind IN ('comment', 'event') AND data->>'taskId' = $2", params: [workspace.id, task.id] },
-        { text: 'DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3', params: [workspace.id, task.id, task.revision] },
-      ]);
+      const deleted = await db.transaction(async (tx) => {
+        const rows = await tx.query('DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3 RETURNING id', [workspace.id, task.id, task.revision]);
+        if (!rows.length) return false;
+        await tx.query("DELETE FROM records WHERE workspace_id = $1 AND kind IN ('comment', 'event') AND data->>'taskId' = $2", [workspace.id, task.id]);
+        return true;
+      });
+      if (!deleted) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
       return result();
     }
 
@@ -457,6 +460,15 @@ export async function POST(req: Request) {
       }
       await db.transaction(async (tx) => {
         if (wantsName) {
+          await tx.query(
+            `UPDATE records r SET data = jsonb_set(jsonb_set(r.data, '{assigneeId}', to_jsonb($1::text)), '{assignee}', to_jsonb($2::text)), revision = revision + 1
+             WHERE kind = 'task' AND (data->>'assigneeId' = $1 OR (
+               data->>'assigneeId' IS NULL AND lower(trim(data->>'assignee')) = ANY($3::text[])
+               AND EXISTS (SELECT 1 FROM workspace_members wm WHERE wm.workspace_id = r.workspace_id AND wm.user_id = $1)
+               AND NOT EXISTS (SELECT 1 FROM workspace_members wm WHERE wm.workspace_id = r.workspace_id AND wm.user_id <> $1
+                 AND lower(trim(data->>'assignee')) IN (lower(trim(wm.name)), lower(trim(wm.email))))))`,
+            [user.userId, name, identitiesOf(user).map((v) => v.trim().toLowerCase()).filter(Boolean)],
+          );
           await tx.query('UPDATE users SET name = $2 WHERE id = $1', [user.userId, name]);
           await tx.query('UPDATE workspace_members SET name = $2 WHERE user_id = $1', [user.userId, name]);
         }
@@ -488,6 +500,9 @@ export async function POST(req: Request) {
       return response({ error: 'Action invalide.' }, 400);
     }
     if (!canWrite(workspace.role)) return response({ error: 'Votre rôle est en lecture seule.' }, 403);
+    if (body.action === 'create' && body.kind === 'client' && workspace.role !== 'owner') {
+      return response({ error: 'Seul le propriétaire peut ajouter des clients.' }, 403);
+    }
     const rows = rowsNow;
     const existing =
       body.action === 'update'
@@ -501,11 +516,18 @@ export async function POST(req: Request) {
     const parsed = fields.safeParse(body.data);
     if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
     const data = parsed.data;
+    let assigneeId = existing?.assigneeId;
+    if (body.kind === 'task' && !data.assignee) assigneeId = undefined;
     if (body.kind === 'task' && data.assignee) {
       const availableMembers = await members(workspace.id);
       const allowedAssignees = new Set(
         availableMembers.filter((m) => isStudioRole(m.role)).flatMap((member) => [member.name, member.email].filter((value): value is string => !!value)),
       );
+      const matching = availableMembers.filter((m) => isStudioRole(m.role) && [m.name, m.email].includes(data.assignee!));
+      if (data.assignee !== existing?.assignee || !assigneeId) {
+        if (matching.length > 1) return response({ error: 'Choisissez une personne de l’équipe pour l’assignation.' }, 400);
+        if (matching.length === 1) assigneeId = matching[0].userId;
+      }
       const unchangedLegacyAssignee = body.action === 'update' && existing?.assignee === data.assignee;
       if (!allowedAssignees.has(data.assignee) && !unchangedLegacyAssignee) {
         return response({ error: 'Choisissez une personne de l’équipe pour l’assignation.' }, 400);
@@ -535,6 +557,9 @@ export async function POST(req: Request) {
         return response({ error: 'Sélectionnez un sous-projet de ce client.' }, 400);
       }
       data.status = data.status || 'À faire';
+      if (workspace.role === 'creative' && data.status === 'Validé' && existing?.status !== 'Validé') {
+        return response({ error: 'Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.' }, 403);
+      }
       if (['À valider', 'Validé'].includes(data.status) && !data.deliverable) {
         return response({ error: 'Ajoutez un lien livrable avant la validation.' }, 400);
       }
@@ -557,6 +582,7 @@ export async function POST(req: Request) {
     let item = {
       ...existing,
       ...data,
+      ...(body.kind === 'task' ? { assigneeId } : {}),
       id: existing?.id || crypto.randomUUID(),
       kind: body.kind,
       createdAt: existing?.createdAt || now,

@@ -55,7 +55,7 @@ export default function LoginShowcase() {
     if (paused) return;
     const timer = setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000);
     return () => clearInterval(timer);
-  }, [paused]);
+  }, [paused, slides.length]);
   const slide = slides[index];
   return <div className="showcase" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-live="polite">
     <div className="showcase-frame" key={slide.key}>

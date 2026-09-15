@@ -6,7 +6,7 @@ import { isWorkspaceRole } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
-export const assetLimits = { maxBytes: 1_500_000, types: ['image/png', 'image/jpeg', 'image/webp'], kinds: ['logo', 'banner', 'avatar'] as const };
+const assetLimits = { maxBytes: 1_500_000, types: ['image/png', 'image/jpeg', 'image/webp'], kinds: ['logo', 'banner', 'avatar'] as const };
 
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
 

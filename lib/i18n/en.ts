@@ -1,5 +1,11 @@
 // English. Keys are the French source strings (see lib/i18n/index.ts).
 export const en: Record<string, string> = {
+  "Gère les clients existants, projets, tâches, archivage, verrou J−7, pilotage et invitations. La création de clients est réservée au propriétaire.": "Manages existing clients, projects, tasks, archiving, the D−7 lock, reporting and invitations. Only the owner creates clients.",
+  "Fait avancer ses tâches ou celles à prendre, commente, modifie les clients existants et gère les sous-projets. Équipe en lecture seule. Ni création de clients ou de tâches, ni validation client, ni archivage, ni pilotage.": "Works on assigned or unassigned tasks, comments, edits existing clients and manages sub-projects. Team is read-only. Cannot create clients or tasks, approve for clients, archive, or access reporting.",
+  "Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.": "Only the client, owner or an administrator can approve a deliverable.",
+  "Copié": "Copied",
+  "Copie impossible. Sélectionnez le mot de passe pour le copier.": "Could not copy. Select the password and copy it manually.",
+  'Seul le propriétaire peut ajouter des clients.': 'Only the owner can add clients.',
   ' Vous pouvez les modifier ou les archiver.': ' You can edit or archive them.',
   ' h et ': ' h and ',
   ' puis ': ' then ',

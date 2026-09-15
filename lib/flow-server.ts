@@ -11,7 +11,29 @@ export async function loadRecords(workspaceId: string): Promise<RecordItem[]> {
     "SELECT id, kind, data, revision FROM records WHERE workspace_id = $1 AND kind != 'meta'",
     [workspaceId],
   );
-  return rows.map((row) => ({ ...parse(row.data), id: row.id, kind: row.kind, revision: row.revision })) as RecordItem[];
+  const roster = await database().query<{userId: string; name: string | null; email: string | null}>(
+    "SELECT user_id AS \"userId\", name, email FROM workspace_members WHERE workspace_id = $1 AND role <> 'client'", [workspaceId],
+  );
+  const items = rows.map((row) => {
+    const item = { ...parse(row.data), id: row.id, kind: row.kind, revision: row.revision } as RecordItem;
+    if (item.kind === 'task' && item.assignee?.trim()) {
+      if (!item.assigneeId) {
+        const value = item.assignee.trim().toLowerCase();
+        const matches = roster.filter((m) => [m.name, m.email].some((v) => v?.trim().toLowerCase() === value));
+        // Ambiguous or departed legacy identities remain visible to managers only.
+        item.assigneeId = matches.length === 1 ? matches[0].userId : 'legacy:' + value;
+      }
+      const assigned = roster.find((m) => m.userId === item.assigneeId);
+      if (assigned) item.assignee = assigned.name || assigned.email || item.assignee;
+    }
+    return item;
+  });
+  for (const item of items) {
+    if (item.kind === 'task' && item.assigneeId && !parse(rows.find((r) => r.id === item.id)!.data).assigneeId) {
+      await database().query("UPDATE records SET data = jsonb_set(data, '{assigneeId}', to_jsonb($3::text)) WHERE workspace_id = $1 AND id = $2 AND data->>'assigneeId' IS NULL", [workspaceId, item.id, item.assigneeId]);
+    }
+  }
+  return items;
 }
 
 export const insertRecord = (record: RecordItem, owner: string, workspaceId: string, ignoreConflict = false): Statement => ({
