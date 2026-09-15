@@ -74,8 +74,9 @@ ok(!y.members.some((m) => m.userId.startsWith('invite:')), 'pending invitations 
 await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { name: 'Affiche Amine', clientId: c1.id, projectId: p1.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } }, 404);
 await post({ action: 'comment', taskId: ta1.id, text: 'intrusion' }, 404);
 await post({ action: 'comment', taskId: tu.id, text: 'je prends' });
-const handed = await post({ action: 'update', kind: 'task', id: ty2.id, revision: 1, data: { name: 'Post Yasmine', clientId: c2.id, projectId: p2.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } });
-ok(!handed.records.some((r) => r.id === ty2.id), 'handing a task to a teammate moves it out of my view');
+// A member's only edit on a task is the deliverable link — no reassigning or handing off to a teammate.
+await post({ action: 'update', kind: 'task', id: ty2.id, revision: 1, data: { name: 'Post Yasmine', clientId: c2.id, projectId: p2.id, assignee: 'Amine Creative', status: 'En cours', due: '2026-12-01' } }, 403);
+ok((await get()).records.some((r) => r.id === ty2.id), 'the task stays with Yasmine after the rejected hand-off');
 await post({ action: 'create', kind: 'task', data: { name: 'Story créée par Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'À faire', due: '2026-12-05' } }, 403);
 as(owner);
 const mine = await t('Story pour Yasmine', c1.id, p1.id, 'Yasmine Creative');
@@ -91,7 +92,9 @@ await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, da
 await post({ action: 'invite-member', email: 'z@z.test', role: 'creative' }, 403);
 await post({ action: 'demo' }, 403);
 await post({ action: 'request', clientId: c1.id, data: { name: 'Demande' } }, 403);
-const sent = await post({ action: 'update', kind: 'task', id: ty1.id, revision: 1, data: { name: 'Reel Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'À valider', due: '2026-12-01', deliverable: 'https://x.test/y1.mp4' } });
+// Saving a new deliverable link is the only edit a member can make, and it alone sends the task for validation.
+const sent = await post({ action: 'update', kind: 'task', id: ty1.id, revision: 1, data: { name: 'Reel Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'En cours', due: '2026-12-01', deliverable: 'https://x.test/y1-final.mp4' } });
+eq(sent.records.find((r) => r.id === ty1.id).status, 'À valider', 'the deliverable link alone moves the task to "À valider"');
 ok(sent.records.find((r) => r.id === ty1.id).approvalDueAt, 'a member can send their own work to the client');
 await post({ action: 'comment', taskId: ty1.id, text: 'Envoyé !' });
 const awaiting = sent.records.find((r) => r.id === ty1.id);
@@ -100,7 +103,7 @@ await post({ action: 'update', kind: 'task', id: ty1.id, revision: awaiting.revi
 // Amine sees the mirror image.
 as(amine);
 const a = await get();
-eq(ids(a, 'task'), [ta1.id, ty2.id, tu.id].sort(), 'Amine’s task, the one Yasmine handed over, and the unassigned one');
+eq(ids(a, 'task'), [ta1.id, tu.id].sort(), 'Amine’s task and the unassigned one; ty2 stayed with Yasmine since the hand-off was rejected');
 eq(a.records.filter((r) => r.kind === 'comment').length, 2, 'comments on Amine’s task and on the unassigned task are visible to Amine; Yasmine’s own-task comment is not');
 
 // The client sees their portal only: their client, projects and tasks — nobody else’s.

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       const parsed = signInInput.safeParse(body);
       if (!parsed.success) return json({ error: parsed.error.issues[0].message }, 400);
       const session = await signIn(parsed.data);
-      return json({ ok: true, mustChangePassword: session.mustChangePassword }, 200, { 'Set-Cookie': sessionCookie(settings.secure, session.token, session.expires) });
+      return json({ ok: true, mustChangePassword: session.mustChangePassword }, 200, { 'Set-Cookie': sessionCookie(settings.secure, session.token) });
     }
     if (action === 'change-password') {
       const user = await getAppUser(req);

@@ -536,6 +536,19 @@ export async function POST(req: Request) {
     if (workspace.role === 'creative' && !!data.archived !== !!existing?.archived) {
       return response({ error: 'Seuls les administrateurs peuvent archiver ou restaurer des éléments.' }, 403);
     }
+    // A member's only edit on a task is the deliverable link; every other field is read-only for them.
+    // Falsy values (undefined/null/false/'') are treated as equivalent so an unset field sent back
+    // as its default (e.g. archived: false) is never mistaken for a change.
+    if (workspace.role === 'creative' && body.kind === 'task' && existing) {
+      const memberEditableFields = new Set(['deliverable']);
+      const normalize = (value: unknown) => (value || null);
+      const touchedFields = (Object.keys(data) as (keyof typeof data)[]).filter(
+        (key) => normalize(data[key]) !== normalize((existing as Record<string, unknown>)[key]),
+      );
+      if (touchedFields.some((key) => !memberEditableFields.has(key as string))) {
+        return response({ error: 'Un membre ne peut modifier que le lien livrable de cette tâche.' }, 403);
+      }
+    }
     if (existing?.archived && data.archived !== false) {
       return response({ error: 'Restaurez cet élément avant de le modifier.' }, 400);
     }
@@ -550,13 +563,20 @@ export async function POST(req: Request) {
     }
     let lockLifted = false;
     if (body.kind === 'task') {
-      const project = rows.find(
-        (record) => record.kind === 'project' && record.id === data.projectId && record.clientId === data.clientId,
-      );
-      if (!project || (project.archived && !data.archived)) {
-        return response({ error: 'Sélectionnez un sous-projet de ce client.' }, 400);
+      if (data.projectId) {
+        const project = rows.find(
+          (record) => record.kind === 'project' && record.id === data.projectId && record.clientId === data.clientId,
+        );
+        if (!project || (project.archived && !data.archived)) {
+          return response({ error: 'Sélectionnez un sous-projet de ce client.' }, 400);
+        }
       }
       data.status = data.status || 'À faire';
+      // "À valider" is never picked manually: saving a new/changed deliverable link is what sends a task for validation.
+      const previousStatus = existing?.status || 'À faire';
+      if (data.status === previousStatus && existing?.status !== 'Validé' && data.deliverable && data.deliverable !== existing?.deliverable) {
+        data.status = 'À valider';
+      }
       if (workspace.role === 'creative' && data.status === 'Validé' && existing?.status !== 'Validé') {
         return response({ error: 'Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.' }, 403);
       }
@@ -636,6 +656,16 @@ export async function POST(req: Request) {
       if (dropped.length) await db.query('DELETE FROM assets WHERE workspace_id = $1 AND id = ANY($2::text[])', [workspace.id, dropped]);
     } else {
       await insert(item);
+    }
+    // Studio-wide events for the polling alerts panel: a new client, or a task handed to someone.
+    // IDs are prefixed evt: (like every other event) so mark-read recognizes and can clear them.
+    if (body.kind === 'client' && !existing) {
+      await insert({ id: `evt:${item.id}:client-added:${now}`, kind: 'event', revision: 1, type: 'client-added', audience: 'studio',
+        name: `Nouveau client « ${item.name} » ajouté par ${actor}.`, clientId: item.id, createdAt: now }, true);
+    }
+    if (body.kind === 'task' && data.assignee && data.assignee !== existing?.assignee) {
+      await insert({ id: `evt:${item.id}:task-assigned:${now}`, kind: 'event', revision: 1, type: 'task-assigned', audience: 'studio',
+        name: `« ${item.name} » assignée à ${data.assignee} par ${actor}.`, taskId: item.id, clientId: item.clientId, createdAt: now }, true);
     }
     return result({ id: item.id });
   } catch (error) {

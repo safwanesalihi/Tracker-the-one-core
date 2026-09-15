@@ -57,7 +57,7 @@ export type RecordItem = {
   reminders?: string[];        // task: reminder keys already emitted
   request?: { by: string; email?: string; at: string }; // task: came from the portal request form
   // event fields
-  type?: 'reminder' | 'auto-approved' | 'sweep' | 'lock' | 'request' | 'decision';
+  type?: 'reminder' | 'auto-approved' | 'sweep' | 'lock' | 'request' | 'decision' | 'client-added' | 'task-assigned';
   audience?: 'studio' | 'client' | 'both';
   read?: boolean;
 };

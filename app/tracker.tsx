@@ -101,7 +101,6 @@ import {
   RecordItem,
   Status,
   statuses,
-  sources,
   channels,
   dayKey,
   safeLink,
@@ -163,6 +162,20 @@ type ApiPayload = {
   today?: string; mailConfigured?: boolean; invitation?: Invitation; error?: string; code?: string;
 };
 const statusSymbols = ["○", "◐", "●", "✓"];
+const defaultColWidths: Record<string, number> = {
+  task: 220,
+  status: 130,
+  client: 130,
+  project: 150,
+  assignee: 130,
+  due: 110,
+  deliverable: 110,
+  source: 100,
+  channel: 100,
+};
+const MIN_COL_WIDTH = 60;
+const MIN_SIDEBAR_WIDTH = 190;
+const MAX_SIDEBAR_WIDTH = 420;
 function CourtChip({ task }: { task: RecordItem }) {
   const { t: tr } = useI18n();
   const c: Court = courtOf(task);
@@ -218,7 +231,9 @@ function StatusPick({
         </span>
       </SelectTrigger>
       <SelectContent position="popper" align="start">
-        {statuses.filter((s) => allowApproval || s !== "Validé").map((s) => (
+        {statuses
+          .filter((s) => s !== "À valider" && (allowApproval || s !== "Validé"))
+          .map((s) => (
           <SelectItem key={s} value={s}>
             <span className="inline">
               <span aria-hidden="true">
@@ -270,6 +285,44 @@ function Pick({
             </SelectItem>
           ),
         )}
+      </SelectContent>
+    </Select>
+  );
+}
+function AssigneePick({
+  value,
+  onChange,
+  items,
+  label,
+  emptyLabel = "—",
+  disabled = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  items: { value: string; avatar?: string | null }[];
+  label: string;
+  emptyLabel?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Select
+      disabled={disabled}
+      value={value || "__none"}
+      onValueChange={(v) => onChange(v === "__none" ? "" : v)}
+    >
+      <SelectTrigger aria-label={label} className="pick assignee-pick">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none">{emptyLabel}</SelectItem>
+        {items.map((i) => (
+          <SelectItem key={i.value} value={i.value}>
+            <span className="inline">
+              <Avatar name={i.value} avatar={i.avatar} />
+              {i.value}
+            </span>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -389,6 +442,8 @@ export default function Tracker() {
     [changePassword, setChangePassword] = useState(false),
     [mailConfigured, setMailConfigured] = useState(false);
   const workspaceIdRef = useRef<string | null>(null);
+  // Ids of studio alert events already seen, so polling only toasts genuinely new ones.
+  const knownAlertIdsRef = useRef<Set<string> | null>(null);
   const [route, setRoute] = useState<Route>({ page: "home" }),
     [view, setView] = useState("table"),
     [query, setQuery] = useState(""),
@@ -409,6 +464,73 @@ export default function Tracker() {
     [comment, setComment] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
     [globalQuery, setGlobalQuery] = useState("");
+  // Column and sidebar widths are a per-browser convenience, remembered locally per person.
+  // Starting from the static default (not reading localStorage here) keeps the server and the
+  // first client render identical; the stored width is applied client-side just after mount.
+  const [colWidths, setColWidths] = useState<Record<string, number>>(defaultColWidths);
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  // Kanban drag feedback: which card is being dragged, and which column it's currently over.
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null),
+    [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("the-one.tableColWidths") || "{}");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage read after mount
+      setColWidths((w) => ({ ...w, ...saved }));
+    } catch { /* private mode */ }
+    try {
+      const saved = Number(localStorage.getItem("the-one.sidebarWidth"));
+      if (saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH) setSidebarWidth(saved);
+    } catch { /* private mode */ }
+  }, []);
+  const startColResize = useCallback(
+    (key: string) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = colWidths[key] ?? defaultColWidths[key] ?? 120;
+      let current = startWidth;
+      const onMove = (ev: MouseEvent) => {
+        current = Math.max(MIN_COL_WIDTH, startWidth + (ev.clientX - startX));
+        setColWidths((w) => ({ ...w, [key]: current }));
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        try {
+          localStorage.setItem(
+            "the-one.tableColWidths",
+            JSON.stringify({ ...colWidths, [key]: current }),
+          );
+        } catch { /* private mode */ }
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [colWidths],
+  );
+  const onSidebarResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+      let current = startWidth;
+      const onMove = (ev: MouseEvent) => {
+        const delta = ev.clientX - startX;
+        current = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, startWidth + (rtl ? -delta : delta)));
+        setSidebarWidth(current);
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        try {
+          localStorage.setItem("the-one.sidebarWidth", String(current));
+        } catch { /* private mode */ }
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [sidebarWidth, rtl],
+  );
   const navigate = useCallback((r: Route) => {
     setRoute(r);
     setQuery("");
@@ -451,9 +573,9 @@ export default function Tracker() {
     if (role === "client" && !["portal", "review"].includes(route.page))
       navigate({ page: "portal", id: workspace.clientId || "", tab: "home" });
   }, [workspace, route.page, navigate]);
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError("");
     try {
       const res = await fetch("/api/records", {
         headers: workspaceIdRef.current
@@ -462,6 +584,7 @@ export default function Tracker() {
       });
       const data: ApiPayload = await res.json();
       if (res.status === 401) {
+        if (silent) return;
         setAuth(true);
         setRecords([]);
         setMembers([]);
@@ -470,6 +593,7 @@ export default function Tracker() {
         return;
       }
       if (res.status === 403) {
+        if (silent) return;
         setRecords([]);
         setMembers([]);
         setWorkspace(null);
@@ -484,6 +608,23 @@ export default function Tracker() {
         }
       }
       if (!res.ok) throw Error(data.error);
+      // Instant-enough alerts: toast any studio event (new client, new assignment…) that showed up
+      // since the last poll, without re-alerting on ones already seen or read.
+      const alerts = data.records.filter(
+        (r) =>
+          r.kind === "event" &&
+          r.audience !== "client" &&
+          !r.read &&
+          (r.type === "client-added" || r.type === "task-assigned"),
+      );
+      const seen = knownAlertIdsRef.current;
+      if (seen) {
+        const fresh = alerts.filter((r) => !seen.has(r.id));
+        if (fresh.length === 1) setNotice(fresh[0].name);
+        else if (fresh.length > 1)
+          setNotice(tr("{n} nouvelles notifications", { n: fresh.length }));
+      }
+      knownAlertIdsRef.current = new Set(alerts.map((r) => r.id));
       setRecords(data.records);
       setUser(data.user);
       setWorkspace(data.workspace);
@@ -497,15 +638,23 @@ export default function Tracker() {
       setNoAccess(false);
       setChangePassword(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chargement impossible.");
+      if (!silent) setError(e instanceof Error ? e.message : "Chargement impossible.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [tr]);
   // Initial authenticated fetch synchronizes the UI with the server.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial external data fetch
     void load();
+  }, [load]);
+  // Poll for new studio alerts (client added, task assigned…) while the tab is open and visible.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible" && workspaceIdRef.current)
+        void load(true);
+    }, 15000);
+    return () => clearInterval(id);
   }, [load]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -665,6 +814,8 @@ export default function Tracker() {
   const writable = !!workspace && ["owner", "admin", "creative"].includes(workspace.role);
   const manager = !!workspace && isManager(workspace.role),
     member = workspace?.role === "creative";
+  // A member's only edit on a task is the deliverable link; every other field stays locked.
+  const memberTaskOnly = member && modal?.type === "task" && !!modal.record;
   const archived = (r: RecordItem) =>
     !!r.archived ||
     !!clients.find((c) => c.id === r.clientId)?.archived ||
@@ -695,7 +846,7 @@ export default function Tracker() {
       ? members.find((m) => memberName(m) === name || m.email === name)?.avatar
       : undefined;
   const pname = (id?: string) =>
-    projects.find((p) => p.id === id)?.name || "Sous-projet";
+    projects.find((p) => p.id === id)?.name || tr("Aucun sous-projet");
   const dateLabel = (date?: string) =>
     date
       ? new Date(date + "T12:00:00").toLocaleDateString(tag, {
@@ -859,7 +1010,6 @@ export default function Tracker() {
       }
       const data: Record<string, unknown> = { ...form };
       if (modal.type === "task") {
-        if (!data.projectId) throw Error(tr("Choisissez un sous-projet."));
         if (!data.clientId) throw Error(tr("Choisissez un client."));
         data.evergreen = form.evergreen === "true";
         data.publishable = form.publishable !== "false";
@@ -1001,21 +1151,31 @@ export default function Tracker() {
             <TableHeader>
               <TableRow>
                 {([
-                  [Type, "Tâche"],
-                  [CheckCircle2, "Statut"],
-                  [Briefcase, "Client"],
-                  [Folder, "Sous-projet"],
-                  [UserRound, "Assigné"],
-                  [CalendarDays, "Échéance"],
-                  [LinkIcon, "Livrable"],
-                  [Flag, "Source"],
-                  [Megaphone, "Camp"],
-                ] as [LucideIcon, string][]).map(([Icon, label]) => (
-                  <TableHead key={label}>
+                  [Type, "Tâche", "task"],
+                  [CheckCircle2, "Statut", "status"],
+                  [Briefcase, "Client", "client"],
+                  [Folder, "Sous-projet", "project"],
+                  [UserRound, "Assigné", "assignee"],
+                  [CalendarDays, "Échéance", "due"],
+                  [LinkIcon, "Livrable", "deliverable"],
+                  [Flag, "Source", "source"],
+                  [Megaphone, "Camp", "channel"],
+                ] as [LucideIcon, string, string][]).map(([Icon, label, key]) => (
+                  <TableHead
+                    key={label}
+                    style={{ width: colWidths[key] ?? defaultColWidths[key] }}
+                  >
                     <span>
                       <Icon size={14} />
                       {tr(label)}
                     </span>
+                    <span
+                      className="col-resize-handle"
+                      onMouseDown={startColResize(key)}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={tr("Redimensionner la colonne")}
+                    />
                   </TableHead>
                 ))}
                 <TableHead
@@ -1208,23 +1368,44 @@ export default function Tracker() {
   function Board() {
     return (
       <div className="board">
-        {statuses.map((s) => (
+        {statuses.map((s) => {
+          const draggingTask = tasks.find((t) => t.id === draggingTaskId);
+          const dropAllowed =
+            !!draggingTask &&
+            writable &&
+            !busy &&
+            !archived(draggingTask) &&
+            draggingTask.status !== s &&
+            s !== "À valider" &&
+            (manager || s !== "Validé");
+          return (
           <section
-            className="board-column"
+            className={`board-column ${dragOverStatus === s ? (dropAllowed ? "drag-over" : "drag-over-blocked") : ""}`}
             key={s}
-            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragOverStatus(s);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = dropAllowed ? "move" : "none";
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null);
+            }}
             onDrop={(e) => {
               e.preventDefault();
+              setDragOverStatus(null);
               const t = tasks.find(
                 (t) => t.id === e.dataTransfer.getData("text/plain"),
               );
-              if (t && writable && !busy && !archived(t) && t.status !== s && (manager || s !== "Validé")) void update(t, { status: s });
+              if (t && writable && !busy && !archived(t) && t.status !== s && s !== "À valider" && (manager || s !== "Validé")) void update(t, { status: s });
             }}
           >
             <header>
               <Chip status={s} />
               <small>{filtered.filter((t) => t.status === s).length}</small>
-              {manager && (
+              {manager && s !== "À valider" && (
                 <button
                   aria-label={tr("Créer une tâche {status}", { status: tr(s) })}
                   onClick={() => open("task", undefined, { status: s })}
@@ -1238,11 +1419,17 @@ export default function Tracker() {
               .map((t) => (
                 <article
                   key={t.id}
-                  className="board-card"
+                  className={`board-card ${draggingTaskId === t.id ? "dragging" : ""}`}
                   draggable={writable && !showArchived && !busy}
-                  onDragStart={(e) =>
-                    e.dataTransfer.setData("text/plain", t.id)
-                  }
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", t.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggingTaskId(t.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingTaskId(null);
+                    setDragOverStatus(null);
+                  }}
                 >
                   <small>{cname(t.clientId)}</small>
                   <button
@@ -1304,7 +1491,7 @@ export default function Tracker() {
                   )}
                 </article>
               ))}
-            {manager && (
+            {manager && s !== "À valider" && (
               <button
                 className="add-row"
                 onClick={() => open("task", undefined, { status: s })}
@@ -1314,7 +1501,8 @@ export default function Tracker() {
               </button>
             )}
           </section>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -1893,6 +2081,10 @@ export default function Tracker() {
                         <Bell size={15} />
                       ) : e.type === "auto-approved" ? (
                         <CheckCircle2 size={15} />
+                      ) : e.type === "client-added" ? (
+                        <Building2 size={15} />
+                      ) : e.type === "task-assigned" ? (
+                        <UserRound size={15} />
                       ) : (
                         <Clock size={15} />
                       )}
@@ -1910,7 +2102,11 @@ export default function Tracker() {
                                   ? "Verrou J−7"
                                   : e.type === "request"
                                     ? "Demande"
-                                    : "Décision",
+                                    : e.type === "client-added"
+                                      ? "Nouveau client"
+                                      : e.type === "task-assigned"
+                                        ? "Assignation"
+                                        : "Décision",
                         )}{" "}
                         · {timeLabel(e.createdAt)}
                       </small>
@@ -2490,24 +2686,6 @@ export default function Tracker() {
                   </button>
                 </>
               )}
-              {task.status !== "À valider" && task.status !== "Validé" && (
-                <button
-                  disabled={!writable || busy || archived(task)}
-                  className="btn primary"
-                  onClick={() =>
-                    update(
-                      task,
-                      { status: "À valider" },
-                      tr("Envoyé au client · validation tacite dans {n} h", {
-                        n: flow.validationHours,
-                      }),
-                    )
-                  }
-                >
-                  <Send size={15} />
-                  {tr("Envoyer au client")}
-                </button>
-              )}
               {task.status === "Validé" &&
                 !task.publishedAt &&
                 !task.evergreen &&
@@ -2760,7 +2938,6 @@ export default function Tracker() {
                 ["Sous-projet", pname(task.projectId)],
                 ["Assigné", task.assignee || tr("Non assigné")],
                 ["Publication", dateLabel(task.due)],
-                ["Source", task.source ? tr(task.source) : "—"],
                 ["Canal", task.channel || "—"],
                 [
                   "Tours de retours",
@@ -2774,6 +2951,24 @@ export default function Tracker() {
                 </div>
               ))}
               <div>
+                <dt>{tr("Lien de brief")}</dt>
+                <dd>
+                  {task.source && safeLink(task.source) ? (
+                    <a
+                      href={safeLink(task.source)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-link"
+                    >
+                      {tr("Ouvrir le brief")}
+                      <ArrowUpRight size={14} />
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div>
                 <dt>{tr("Statut")}</dt>
                 <dd>
                   <Pick
@@ -2782,7 +2977,9 @@ export default function Tracker() {
                     onChange={(s) => {
                       if (s) void update(task, { status: s as Status });
                     }}
-                    items={manager ? [...statuses] : statuses.filter((s) => s !== "Validé")}
+                    items={(manager ? [...statuses] : statuses.filter((s) => s !== "Validé")).filter(
+                      (s) => s !== "À valider" || task.status === "À valider",
+                    )}
                   />
                 </dd>
               </div>
@@ -2897,7 +3094,7 @@ export default function Tracker() {
               <LogOut size={15} />
               {tr("Se déconnecter")}
             </button>
-            <button className="btn" onClick={load}>
+            <button className="btn" onClick={() => void load()}>
               <RefreshCw size={15} />
               {tr("Réessayer")}
             </button>
@@ -2979,7 +3176,7 @@ export default function Tracker() {
     );
   return (
     <SidebarProvider
-      style={{ "--sidebar-width": "260px" } as React.CSSProperties}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
     >
       <Sidebar className="tracker-sidebar" side={rtl ? "right" : "left"}>
         <SidebarHeader>
@@ -3131,6 +3328,14 @@ export default function Tracker() {
           </div>
         </SidebarFooter>
       </Sidebar>
+      <div
+        className="sidebar-resize-handle"
+        style={rtl ? { right: sidebarWidth } : { left: sidebarWidth }}
+        onMouseDown={onSidebarResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={tr("Redimensionner la barre latérale")}
+      />
       <main className="workspace">
         <header className="topbar">
           <SidebarTrigger aria-label={tr("Afficher le menu")} />
@@ -3164,7 +3369,7 @@ export default function Tracker() {
           <button
             className="icon-button"
             aria-label={tr("Actualiser les données")}
-            onClick={load}
+            onClick={() => void load()}
           >
             <RefreshCw size={15} />
           </button>
@@ -3173,7 +3378,7 @@ export default function Tracker() {
           {error && (
             <div className="error-banner" role="alert">
               <span>{tr(error)}</span>
-              <button className="btn" onClick={load}>
+              <button className="btn" onClick={() => void load()}>
                 {tr("Actualiser")}
               </button>
               <button
@@ -3354,20 +3559,30 @@ export default function Tracker() {
               </label>
             ) : (
               <div className="form-fields">
-                <label className="form-field title-field">
-                  <span>{tr("Nom *")}</span>
-                  <input
-                    autoFocus
-                    required
-                    maxLength={160}
-                    value={form.name || ""}
-                    onChange={(e) => set("name", e.target.value)}
-                    placeholder={tr(
-                      modal?.type === "task" ? "Nom de la tâche" : "Nom",
+                {memberTaskOnly && (
+                  <p className="confirm-copy">
+                    {tr(
+                      "En tant que membre, vous ne pouvez ajouter que le lien livrable de « {name} ».",
+                      { name: modal?.record?.name ?? "" },
                     )}
-                  />
-                </label>
-                {modal?.type !== "client" && (
+                  </p>
+                )}
+                {!memberTaskOnly && (
+                  <label className="form-field title-field">
+                    <span>{tr("Nom *")}</span>
+                    <input
+                      autoFocus
+                      required
+                      maxLength={160}
+                      value={form.name || ""}
+                      onChange={(e) => set("name", e.target.value)}
+                      placeholder={tr(
+                        modal?.type === "task" ? "Nom de la tâche" : "Nom",
+                      )}
+                    />
+                  </label>
+                )}
+                {modal?.type !== "client" && !memberTaskOnly && (
                   <label className="form-field">
                     <span>{tr("Client *")}</span>
                     <Pick
@@ -3380,12 +3595,13 @@ export default function Tracker() {
                     />
                   </label>
                 )}
-                {modal?.type === "task" && (
+                {modal?.type === "task" && !memberTaskOnly && (
                   <>
                     <label className="form-field">
-                      <span>{tr("Sous-projet *")}</span>
+                      <span>{tr("Sous-projet")}</span>
                       <Pick
                         label={tr("Sous-projet")}
+                        emptyLabel={tr("Aucun sous-projet")}
                         value={form.projectId || ""}
                         onChange={(v) => set("projectId", v)}
                         items={projects
@@ -3394,20 +3610,11 @@ export default function Tracker() {
                           )
                           .map((p) => ({ value: p.id, label: p.name }))}
                       />
-                      {!projects.some(
-                        (p) => p.clientId === form.clientId && !p.archived,
-                      ) && (
-                        <small>
-                          {tr(
-                            "Créez un sous-projet depuis la fiche client avant d’ajouter une tâche.",
-                          )}
-                        </small>
-                      )}
                     </label>
                     <div className="form-pair">
                       <label className="form-field">
                         <span>{tr("Assigné")}</span>
-                        <Pick
+                        <AssigneePick
                           label={tr("Assigné")}
                           emptyLabel={tr("Non assigné")}
                           value={form.assignee || ""}
@@ -3417,7 +3624,7 @@ export default function Tracker() {
                               ...members.map(memberName),
                               ...(form.assignee ? [form.assignee] : []),
                             ]),
-                          ].map((value) => ({ value, label: value }))}
+                          ].map((value) => ({ value, avatar: avatarOf(value) }))}
                         />
                       </label>
                       <label className="form-field">
@@ -3431,27 +3638,17 @@ export default function Tracker() {
                     </div>
                     <div className="form-pair">
                       <label className="form-field">
-                        <span>{tr("Source / lien de brief")}</span>
+                        <span>{tr("Lien de brief")}</span>
                         <input
-                          type="text"
+                          type="url"
                           maxLength={2000}
-                          list="task-sources"
                           value={form.source || ""}
                           onChange={(e) => set("source", e.target.value)}
-                          placeholder={tr(
-                            "Réunion, WhatsApp… ou un lien https://",
-                          )}
+                          placeholder="https://…"
                         />
-                        <datalist id="task-sources">
-                          {sources.map((x) => (
-                            <option key={x} value={x}>
-                              {tr(x)}
-                            </option>
-                          ))}
-                        </datalist>
                         <small>
                           {tr(
-                            "L’origine de la demande, ou le lien du brief, du message ou de la demande client.",
+                            "Lien vers le brief, le message ou la demande client.",
                           )}
                         </small>
                       </label>
@@ -3461,24 +3658,39 @@ export default function Tracker() {
                           label={tr("Statut")}
                           value={form.status || "À faire"}
                           onChange={(v) => set("status", v || "À faire")}
-                          items={[...statuses]}
+                          items={statuses.filter(
+                            (s) => s !== "À valider" || form.status === "À valider",
+                          )}
                         />
                       </label>
                     </div>
-                    <label className="form-field">
-                      <span>{tr("Livrable")}</span>
-                      <input
-                        type="url"
-                        maxLength={2000}
-                        value={form.deliverable || ""}
-                        onChange={(e) => set("deliverable", e.target.value)}
-                        placeholder={
-                          modal.record?.demo
-                            ? tr("Lien d’exemple conservé si vide")
-                            : "https://…"
-                        }
-                      />
-                    </label>
+                  </>
+                )}
+                {modal?.type === "task" && (
+                  <label className="form-field">
+                    <span>{tr("Livrable")}</span>
+                    <input
+                      type="url"
+                      maxLength={2000}
+                      value={form.deliverable || ""}
+                      onChange={(e) => set("deliverable", e.target.value)}
+                      placeholder={
+                        modal.record?.demo
+                          ? tr("Lien d’exemple conservé si vide")
+                          : "https://…"
+                      }
+                    />
+                    {memberTaskOnly && (
+                      <small>
+                        {tr(
+                          "Ajouter un lien envoie automatiquement la tâche en validation.",
+                        )}
+                      </small>
+                    )}
+                  </label>
+                )}
+                {modal?.type === "task" && !memberTaskOnly && (
+                  <>
                     <label className="form-check">
                       <input
                         type="checkbox"

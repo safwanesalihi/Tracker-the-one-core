@@ -53,8 +53,11 @@ await post({action:'set-member-role',userId:'owner-a',role:'viewer',expectedRole
 await post({action:'remove-member',userId:'owner-a',expectedRole:'owner'},403);
 await post({action:'create',kind:'project',data:{name:'Archived create',clientId:c.id,archived:true}},403);
 await post({action:'update',kind:'task',id:t.id,revision:4,data:{...base,archived:true}},403);
-const memberUpdate=await post({action:'update',kind:'task',id:t.id,revision:4,data:{...base,archived:false,description:'Updated by a creative member'}});
+// A member's only edit on a task is the deliverable link; every other field is read-only for them.
+await post({action:'update',kind:'task',id:t.id,revision:4,data:{...base,archived:false,description:'Updated by a creative member'}},403);
+const memberUpdate=await post({action:'update',kind:'task',id:t.id,revision:4,data:{...base,archived:false,deliverable:'https://example.com/member-update.pdf'}});
 assert.equal(memberUpdate.records.find(r=>r.id===t.id).revision,5);
+assert.equal(memberUpdate.records.find(r=>r.id===t.id).status,'À valider','saving a new deliverable link auto-sends the task for validation');
 globalThis.testUser={...globalThis.testUser,userId:'owner-a'};
 await post({action:'set-member-role',userId:'member-a',role:'viewer',expectedRole:'creative'});
 globalThis.testUser={...globalThis.testUser,userId:'member-a'};
@@ -99,7 +102,7 @@ await post({action:'create',kind:'client',data:{name:'Stale browser'}},403,'http
 // A removed user can have their own workspace, but never inherit the old workspace's data.
 const separateView=await (await GET(new Request('https://tracker.test/api/records'))).json();assert.notEqual(separateView.workspace.id,'ws:owner-a');assert.deepEqual(separateView.records,[]);
 globalThis.testUser={...globalThis.testUser,userId:'owner-a'};
-assert.equal((await getWorkspace('ws:owner-a')).records.find(r=>r.id===t.id).description,'Updated by a creative member');
+assert.equal((await getWorkspace('ws:owner-a')).records.find(r=>r.id===t.id).deliverable,'https://example.com/member-update.pdf');
 // Unknown stored roles fail closed, including a corrupted owner membership.
 await pg.query('UPDATE workspace_members SET role = $1 WHERE user_id = $2',['invalid','owner-a']);
 assert.equal((await GET(new Request('https://tracker.test/api/records'))).status,403);

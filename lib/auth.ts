@@ -10,8 +10,10 @@ export const sessionSettings = () => readSessionSettings(env);
 export const sessionCookieName = (secure: boolean) => secure ? '__Host-the-one.session' : 'the-one.session';
 export { hashToken, sessionLifetimeSeconds } from '@/lib/session-token';
 
-export function sessionCookie(secure: boolean, token: string, expires: Date) {
-  return `${sessionCookieName(secure)}=${token}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires.toUTCString()}${secure ? '; Secure' : ''}`;
+// No Expires/Max-Age: the browser drops this cookie when it fully closes, so a session never
+// outlives the browser session even though the server-side row is still valid for up to 7 days.
+export function sessionCookie(secure: boolean, token: string) {
+  return `${sessionCookieName(secure)}=${token}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
 }
 export function clearSessionCookie(secure: boolean) {
   return `${sessionCookieName(secure)}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
