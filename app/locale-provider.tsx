@@ -28,6 +28,7 @@ export function formatDate(tag: string, value?: string, options: Intl.DateTimeFo
 export function LocaleProvider({ children, initial }: { children: React.ReactNode; initial?: Locale }) {
   const [locale, setLocaleState] = useState<Locale>(initial ?? 'fr');
   // The stored preference is only known in the browser; apply it after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- the stored choice is read after hydration on purpose (server renders French)
   useEffect(() => { if (!initial) setLocaleState(detectLocale()); }, [initial]);
   useEffect(() => {
     const root = document.documentElement;

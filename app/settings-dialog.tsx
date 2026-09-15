@@ -1,6 +1,6 @@
 'use client';
 // Personal settings, opened from the profile picture in the sidebar: photo, display name, language, sign-out.
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Camera, Check, Languages, Loader2, LogOut, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Avatar from '@/app/profile-avatar';
@@ -17,14 +17,18 @@ type Props = {
   onLogout: () => void;
 };
 
-export default function SettingsDialog({ open, onOpenChange, user, workspaceId, workspaceName, onSave, onLogout }: Props) {
+export default function SettingsDialog(props: Props) {
+  // Remounted each time it opens so the form starts from the current profile.
+  return <SettingsBody key={String(props.open)} {...props} />;
+}
+
+function SettingsBody({ open, onOpenChange, user, workspaceId, workspaceName, onSave, onLogout }: Props) {
   const { t } = useI18n();
-  const [name, setName] = useState(user.name);
+  const [name, setName] = useState(user.name.includes('@') || user.name === workspaceName ? '' : user.name);
   const [busy, setBusy] = useState<'name' | 'photo' | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (open) { setName(user.name.includes('@') || user.name === workspaceName ? '' : user.name); setError(''); setSaved(false); } }, [open, user.name, workspaceName]);
 
   async function saveName(event: React.FormEvent) {
     event.preventDefault();
