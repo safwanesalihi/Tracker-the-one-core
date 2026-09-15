@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/app/locale-provider';
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 type Props = { value?: string; onChange: (value: string) => void; label: string; placeholder?: string };
@@ -14,8 +15,8 @@ const fromKey = (value?: string) => {
   const date = new Date(year, month - 1, day);
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
 };
-const monthLabel = (date: Date) => date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-const dateLabel = (value?: string) => fromKey(value)?.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) || '';
+const monthLabel = (date: Date, tag: string) => date.toLocaleDateString(tag, { month: 'long', year: 'numeric' });
+const dateLabel = (value: string | undefined, tag: string) => fromKey(value)?.toLocaleDateString(tag, { day: 'numeric', month: 'short', year: 'numeric' }) || '';
 
 function monthDays(month: Date) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -26,7 +27,9 @@ function monthDays(month: Date) {
   });
 }
 
-export default function DatePicker({ value = '', onChange, label, placeholder = 'Choisir une date' }: Props) {
+export default function DatePicker({ value = '', onChange, label, placeholder }: Props) {
+  const { t, tag } = useI18n();
+  placeholder ??= t('Choisir une date');
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => fromKey(value) || new Date());
   const [point, setPoint] = useState<Point | null>(null);
@@ -67,22 +70,22 @@ export default function DatePicker({ value = '', onChange, label, placeholder = 
 
   return <div className="date-picker" ref={root}>
     <button type="button" className={`date-picker-trigger ${value ? 'has-value' : ''}`} aria-label={label} aria-expanded={open} onClick={toggle}>
-      <CalendarDays size={15} /> <span>{dateLabel(value) || placeholder}</span>
+      <CalendarDays size={15} /> <span>{dateLabel(value, tag) || placeholder}</span>
     </button>
     {open && point && <div className="date-picker-popover" role="dialog" aria-label={label} style={{ top: point.top, left: point.left, width: Math.max(point.width, 294) }}>
       <header className="date-picker-header">
-        <button type="button" className="date-picker-nav" aria-label="Mois précédent" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={16} /></button>
-        <strong>{monthLabel(month)}</strong>
-        <button type="button" className="date-picker-nav" aria-label="Mois suivant" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={16} /></button>
+        <button type="button" className="date-picker-nav" aria-label={t('Mois précédent')} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={16} /></button>
+        <strong>{monthLabel(month, tag)}</strong>
+        <button type="button" className="date-picker-nav" aria-label={t('Mois suivant')} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={16} /></button>
       </header>
-      <div className="date-picker-weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => <span key={day}>{day}</span>)}</div>
+      <div className="date-picker-weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => <span key={day}>{t(day)}</span>)}</div>
       <div className="date-picker-days">{monthDays(month).map(({ date, current }) => {
         const key = keyFor(date); const isSelected = value === key; const isToday = key === keyFor(new Date());
-        return <button type="button" key={key} className={`date-picker-day ${current ? '' : 'outside'} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`} aria-label={date.toLocaleDateString('fr-FR', { dateStyle: 'full' })} aria-pressed={isSelected} onClick={() => { onChange(key); setOpen(false); }}>{date.getDate()}</button>;
+        return <button type="button" key={key} className={`date-picker-day ${current ? '' : 'outside'} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`} aria-label={date.toLocaleDateString(tag, { dateStyle: 'full' })} aria-pressed={isSelected} onClick={() => { onChange(key); setOpen(false); }}>{date.getDate()}</button>;
       })}</div>
       <footer className="date-picker-footer">
-        <button type="button" className="date-picker-today" onClick={() => { const today = keyFor(new Date()); onChange(today); setOpen(false); }}>Aujourd’hui</button>
-        {value && <button type="button" className="date-picker-clear" aria-label="Effacer la date" onClick={() => { onChange(''); setOpen(false); }}><X size={14} /> Effacer</button>}
+        <button type="button" className="date-picker-today" onClick={() => { const today = keyFor(new Date()); onChange(today); setOpen(false); }}>{t('Aujourd’hui')}</button>
+        {value && <button type="button" className="date-picker-clear" aria-label={t('Effacer la date')} onClick={() => { onChange(''); setOpen(false); }}><X size={14} />{' '}{t('Effacer')}</button>}
       </footer>
     </div>}
   </div>;

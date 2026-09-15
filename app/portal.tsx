@@ -15,6 +15,9 @@ import { type RecordItem, statuses, safeLink, channels, dayKey } from '@/lib/mod
 import { flow, hoursLeft, revisionState, shiftDay } from '@/lib/flow';
 import { Progress } from '@/components/ui/progress';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
+import { readStoredLocale } from '@/lib/i18n';
+import { useI18n } from '@/app/locale-provider';
+import LanguageSwitch from '@/app/language-switch';
 
 export type PortalRoute = { page: string; id?: string; tab?: string };
 type Props = {
@@ -45,16 +48,14 @@ function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: LucideIc
 }
 
 export default function Portal({ mode, records, client, user, route, today, busy, error, notice, navigate, mutate, onNotice, onError, onLeave }: Props) {
-  const copy = portalCopy[portalLocaleFor(client.language)];
+  // The portal follows the app language (toggle in the sidebar). A client who never chose one starts in the
+  // language recorded on their client file.
+  const { locale, setLocale, t } = useI18n();
+  useEffect(() => { if (mode === 'client' && !readStoredLocale()) setLocale(portalLocaleFor(client.language)); }, [mode, client.language, setLocale]);
+  const copy = portalCopy[locale];
   const rtl = copy.dir === 'rtl';
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
-  // Drawers, dialogs and dropdowns are portaled outside .portal-root: direction and language live on <html> while the portal is shown.
-  useEffect(() => {
-    const root = document.documentElement; const prev = { dir: root.getAttribute('dir'), lang: root.getAttribute('lang') };
-    root.setAttribute('dir', copy.dir); root.setAttribute('lang', rtl ? 'ar' : 'fr');
-    return () => { prev.dir ? root.setAttribute('dir', prev.dir) : root.removeAttribute('dir'); prev.lang ? root.setAttribute('lang', prev.lang) : root.removeAttribute('lang'); };
-  }, [copy.dir, rtl]);
   const [dialog, setDialog] = useState<'approve' | 'changes' | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [text, setText] = useState('');
@@ -255,7 +256,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
       {task.status === 'À valider' && <div className="portal-clock-block">{Countdown({ t: task })}<small>{copy.clockRule(flow.validationHours)}</small>{Rounds({ t: task })}</div>}
       {signOff && <div className="portal-receipt"><ShieldCheck size={18} /><div><strong>{copy.receipt}</strong><dl><div><dt>{copy.receiptMode}</dt><dd>{signOff.mode === 'silence' ? copy.silence : signOff.mode === 'studio' ? copy.studio : copy.explicit}</dd></div><div><dt>{copy.receiptContact}</dt><dd>{signOff.by}{signOff.email ? ` · ${signOff.email}` : ''}</dd></div><div><dt>{copy.receiptWhen}</dt><dd>{fmt(signOff.at, true)}</dd></div><div><dt>{copy.receiptRound}</dt><dd>{signOff.round} / {flow.maxRevisionRounds}</dd></div></dl></div></div>}
       <div className="review-layout">
-        <div className="review-canvas">{task.demo ? <div className="sample-document"><span>THE ONE CORE</span><h2>Une idée claire.<br />Une marque singulière.</h2><hr /><p>{client.name}</p><small>{copy.demoDoc}<br />{copy.demoNote}</small></div> : <div className="external-file"><FileText size={50} /><h2>{copy.externalTitle}</h2><p>{copy.externalText}</p>{url ? <a className="btn" href={url} target="_blank" rel="noopener noreferrer">{copy.openFile}<ArrowUpRight size={16} /></a> : <p>{copy.noLink}</p>}</div>}</div>
+        <div className="review-canvas">{task.demo ? <div className="sample-document"><span>THE ONE CORE</span><h2>{t('Une idée claire.')}<br />{t('Une marque singulière.')}</h2><hr /><p>{client.name}</p><small>{copy.demoDoc}<br />{copy.demoNote}</small></div> : <div className="external-file"><FileText size={50} /><h2>{copy.externalTitle}</h2><p>{copy.externalText}</p>{url ? <a className="btn" href={url} target="_blank" rel="noopener noreferrer">{copy.openFile}<ArrowUpRight size={16} /></a> : <p>{copy.noLink}</p>}</div>}</div>
         <aside>
           <section className="comments"><h2>{copy.comments}</h2>
             {comments.map((c) => <div className="comment" key={c.id}><Avatar name={c.author} /><div><strong>{c.author}</strong><small>{fmt(c.createdAt, true)}</small><p>{c.name}</p></div></div>)}
@@ -269,7 +270,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
 
   const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'tasks' ? copy.tasks : tab === 'request' ? copy.request : copy.review;
 
-  return <div dir={copy.dir} lang={rtl ? 'ar' : 'fr'} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
+  return <div dir={copy.dir} lang={locale} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
     <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
       <Sidebar className="tracker-sidebar" side={rtl ? 'right' : 'left'}>
         <SidebarHeader><div className="brand"><img className="sidebar-logo logo-white" src="/the-one-core-logo-white.svg" alt="The One Core" /><div className="brand-client"><ClientMark name={client.name} logo={client.logo} size="md" /><div><strong>{client.name}</strong><small>{copy.portal}</small></div></div></div></SidebarHeader>
@@ -282,8 +283,9 @@ export default function Portal({ mode, records, client, user, route, today, busy
           <NavItem icon={Inbox} label={copy.request} active={tab === 'request'} onClick={() => go('request')} />
         </SidebarMenu></SidebarGroup></SidebarContent>
         <SidebarFooter>
+          <LanguageSwitch />
           {mode === 'preview' && <button className="btn" onClick={onLeave}><ArrowLeft size={15} />{copy.backToStudio}</button>}
-          <div className="user-row"><Avatar name={user.name} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? 'Aperçu studio' : client.name}</small></div>{mode === 'client' && <button disabled={busy} onClick={onLeave} aria-label={copy.signOut}><LogOut size={15} /></button>}</div>
+          <div className="user-row"><Avatar name={user.name} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? t('Aperçu studio') : client.name}</small></div>{mode === 'client' && <button disabled={busy} onClick={onLeave} aria-label={copy.signOut}><LogOut size={15} /></button>}</div>
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">

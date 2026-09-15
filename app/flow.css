@@ -141,10 +141,10 @@
 .portal-request aside h3{margin-bottom:12px;letter-spacing:.12em}
 .portal-confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px;cursor:pointer;padding:12px;border:1px solid #EDECEA;border-radius:6px}
 .portal-confirm input{margin-top:3px;accent-color:#111}
-.portal-rtl .review-card .btn svg,.portal-rtl .text-link svg{transform:scaleX(-1)}
-.portal-rtl .task-line{text-align:right}
-.portal-rtl .calendar-event{text-align:right}
-.portal-rtl,.portal-rtl body{font-family:Inter,"Noto Naskh Arabic","Segoe UI",Tahoma,Arial,sans-serif}
+.portal-rtl .review-card .btn svg,.portal-rtl .text-link svg,[dir=rtl] .review-card .btn svg,[dir=rtl] .text-link svg{transform:scaleX(-1)}
+.portal-rtl .task-line,[dir=rtl] .task-line{text-align:right}
+.portal-rtl .calendar-event,[dir=rtl] .calendar-event{text-align:right}
+.portal-rtl,.portal-rtl body,[dir=rtl],[dir=rtl] body{font-family:Inter,"Noto Naskh Arabic","Segoe UI",Tahoma,Arial,sans-serif}
 
 /* Annexe contractuelle */
 .annex{max-width:820px;margin:0 auto}
@@ -248,7 +248,7 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .portal-table td small{color:#8c96a5}
 .portal-row{cursor:pointer}
 .portal-row:hover{background:#fafbfd}
-.portal-rtl .portal-table th,.portal-rtl .portal-table td{text-align:right}
+.portal-rtl .portal-table th,.portal-rtl .portal-table td,[dir=rtl] .portal-table th,[dir=rtl] .portal-table td{text-align:right}
 .portal-request .pick{width:100%;justify-content:space-between}
 .portal-request .date-picker-trigger{width:100%}
 
@@ -277,7 +277,7 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .portal-progress-head small{color:#8c96a5}
 .portal-progress [data-slot=progress]{background:#edf0f5}
 .portal-progress [data-slot=progress-indicator]{background:#3d8763}
-.portal-rtl .portal-mix strong{text-align:left}
+.portal-rtl .portal-mix strong,[dir=rtl] .portal-mix strong{text-align:left}
 @media (max-width:1000px){.portal-dashboard{grid-template-columns:1fr}.portal-stats-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 [data-slot=sidebar][data-mobile=true] [data-slot=sidebar-inner]{background:#1c1e23}
@@ -321,7 +321,7 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .user-row .user-profile{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:4px;margin:-4px;border:0;border-radius:8px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}
 .user-row .user-profile:hover,.user-row .user-profile:focus-visible{background:#ffffff0f;outline:none}
 .user-row .user-profile>div{flex:1;min-width:0}
-.portal-rtl .user-row .user-profile{text-align:right}
+.portal-rtl .user-row .user-profile,[dir=rtl] .user-row .user-profile{text-align:right}
 
 /* Portal sidebar: the client card (logo or initials, name, portal label) sits under the studio logo. */
 .portal-root .brand>.brand-client,[data-slot=sidebar][data-mobile=true] .brand>.brand-client{flex-direction:row;align-items:center;gap:12px;width:100%;margin-top:18px;padding:10px 12px;border-radius:12px;background:#ffffff0a;border:1px solid #ffffff12}
@@ -331,5 +331,17 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .brand-client small{color:#9aa0ab;font-size:11px}
 /* Portal home hero: same banner and mark as the studio's client overview, read-only. */
 .portal-root .client-hero{margin:-6px 0 22px}
-.portal-rtl .client-hero-mark{margin:-44px 26px 0 0}
+.portal-rtl .client-hero-mark,[dir=rtl] .client-hero-mark{margin:-44px 26px 0 0}
 @media (max-width:700px){.portal-rtl .client-hero-mark{margin-right:16px}}
+/* Language toggle: FR / EN / AR segmented control, dark in sidebars, light on the sign-in screen. */
+.language-switch{display:flex;align-items:center;gap:6px;padding:6px 8px 10px;color:#8d93a0}
+.language-switch button{font:inherit;font-size:11px;font-weight:600;letter-spacing:.06em;padding:4px 9px;border-radius:999px;border:1px solid #ffffff14;background:transparent;color:#a3a8b3;cursor:pointer;line-height:1.4}
+.language-switch button:hover{background:#ffffff10;color:#fff}
+.language-switch button.active{background:#E5A93C;border-color:#E5A93C;color:#1c1e23}
+.language-switch.compact{padding:0;gap:4px}
+.auth-topline{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.auth-topline .auth-logo{margin:0}
+[dir=rtl] .language-switch{direction:ltr;justify-content:flex-end}
+/* Studio in RTL (Arabic): tables, headings and rows read from the right. */
+[dir=rtl] .task-table th,[dir=rtl] .task-table td,[dir=rtl] .properties,[dir=rtl] .page-heading,[dir=rtl] .section-head,[dir=rtl] .metric-card,[dir=rtl] .client-card,[dir=rtl] .form-field{text-align:right}
+[dir=rtl] .text-link.back svg,[dir=rtl] .topbar>svg{transform:scaleX(-1)}

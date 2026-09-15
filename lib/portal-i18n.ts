@@ -1,5 +1,5 @@
 // Client portal copy. French is the studio default; Arabic follows the client record's `language`.
-export type PortalLocale = 'fr' | 'ar';
+export type PortalLocale = 'fr' | 'en' | 'ar';
 
 const fr = {
   dir: 'ltr', locale: 'fr-FR',
@@ -77,6 +77,44 @@ const ar: typeof fr = {
   signOut: 'تسجيل الخروج', notFound: 'الملف غير موجود',
 };
 
-export const portalCopy = { fr, ar };
 export type PortalCopy = typeof fr;
-export const portalLocaleFor = (language?: string): PortalLocale => (language === 'العربية' ? 'ar' : 'fr');
+const en: PortalCopy = {
+  dir: 'ltr', locale: 'en-GB',
+  portal: 'Client portal', space: 'Your space', home: 'Home', review: 'To approve', calendar: 'Calendar', files: 'Deliverables', request: 'Request content', tasks: 'Tasks',
+  colTask: 'Task', colProject: 'Sub-project', colStatus: 'Status', colDate: 'Publication', colFile: 'Deliverable', tasksCount: (n: number) => `${n} task${n !== 1 ? 's' : ''}`, allProjects: 'All sub-projects', noTasks: 'No tasks yet.', choose: 'Choose',
+  hello: (name: string) => `Hello, ${name}`, tagline: 'Here is where your projects stand.',
+  dashboard: 'Dashboard', publishedThisMonth: 'Published this month', quotaTitle: 'This month’s plan', quotaText: (n: number, q: number) => `${n} published out of ${q} item${q !== 1 ? 's' : ''} included`, quotaLeft: (r: number) => r > 0 ? `${r} remaining` : 'Plan reached', noQuota: 'Plan not set by the studio.', progressTitle: 'Progress by sub-project', validatedOf: (d: number, t: number) => `${d} / ${t} approved`, statusMix: 'Where your content stands', thisWeek: 'This week', nothingThisWeek: 'No publication this week.', seeAll: 'See all',
+  waiting: (n: number) => n === 1 ? '1 deliverable is waiting for your approval.' : `${n} deliverables are waiting for your approval.`,
+  nothingWaiting: 'Everything is approved.', nothingWaitingText: 'The next creations to approve will appear here.',
+  inProduction: 'In production', validatedThisMonth: 'Approved this month', upcoming: 'Upcoming publications', activity: 'Recent activity',
+  noUpcoming: 'No publication scheduled.', noFiles: 'No deliverable available', noFilesText: 'Approved files will appear here.',
+  open: 'Open', openReview: 'Open the review', openFile: 'Open the deliverable', back: 'Back to deliverables',
+  approve: 'Approve this deliverable', requestChanges: 'Request changes', comments: 'Comments', writeComment: 'Write a comment…', send: 'Send',
+  conversationStart: 'The conversation starts here.',
+  clock: (h: number) => h >= 24 ? `Without a reply from you, this deliverable will be approved automatically in ${Math.floor(h / 24)} d ${Math.round(h % 24)} h.` : `Without a reply from you, this deliverable will be approved automatically in ${Math.max(1, Math.round(h))} h.`,
+  clockRule: (hours: number) => `Agreed rule: ${hours} h to approve, silence counts as approval.`,
+  rounds: (used: number, included: number) => `Revision rounds used: ${used} / ${included}`,
+  roundsOver: 'Round outside your plan — the studio will contact you before resuming work.',
+  roundsLast: 'Last round included in your plan.',
+  approveTitle: 'Approve this deliverable?', approveText: (v: string) => `By approving “${v}”, you confirm it is compliant and authorise its publication. This action is recorded.`,
+  approveConfirm: 'I confirm I have checked the content, spelling and information.', approveButton: 'Approve permanently',
+  changesTitle: 'Request changes', changesText: 'Group all your remarks in a single message: each submission counts as one revision round.',
+  changesPlaceholder: 'Describe what needs to change…', changesButton: 'Send feedback', cancel: 'Cancel',
+  approved: 'Approved', approvedBy: (by: string) => `Approved by ${by}`, approvedSilence: 'Approved by silence — deadline passed without a reply', approvedStudio: (by: string) => `Approved from the studio by ${by}`,
+  receipt: 'Approval receipt', receiptMode: 'Mode', explicit: 'Explicit approval', silence: 'Tacit approval', studio: 'Studio approval', receiptWhen: 'Date', receiptRound: 'Rounds used', receiptContact: 'Contact',
+  status: { 'À faire': 'To do', 'En cours': 'In progress', 'À valider': 'To approve', 'Validé': 'Approved' } as Record<string, string>,
+  published: 'Published', scheduled: 'Scheduled', noDate: 'No date',
+  requestTitle: 'Request content', requestText: 'Describe what you need. The studio receives the request and schedules it according to the agreed calendar.',
+  requestName: 'Request title', requestProject: 'Sub-project', requestDate: 'Desired date', requestChannel: 'Channel', requestDescription: 'Details, references, copy…',
+  requestButton: 'Send the request', requestSent: 'Request sent. The studio will schedule it.', requestLockNote: (days: number) => `Requests within ${days} days are handled subject to the studio’s availability.`,
+  myRequests: 'Your requests', noRequests: 'No requests yet.', requestedOn: (d: string) => `Requested on ${d}`,
+  previewBanner: 'Studio preview — no client invitation sent. Actions are recorded in your workspace.', leave: 'Leave', backToStudio: 'Back to the studio',
+  weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], today: 'Today', previous: 'Previous month', next: 'Next month',
+  validatedOn: (d: string) => `Approved on ${d}`, sentOn: (d: string) => `Sent on ${d}`, version: 'Deliverable', dueOn: (d: string) => `Publication on ${d}`,
+  reminder: 'Reminder', autoApproved: 'Automatic approval', decision: 'Decision', requestEvent: 'Request',
+  demoDoc: 'Demo document', demoNote: 'This visual is not a real client deliverable.', externalTitle: 'Review the original file', externalText: 'Open the link to examine the deliverable before replying.', noLink: 'No link available.',
+  signOut: 'Sign out', notFound: 'Deliverable not found',
+};
+
+export const portalCopy = { fr, en, ar };
+export const portalLocaleFor = (language?: string): PortalLocale => (language === 'العربية' ? 'ar' : language === 'English' ? 'en' : 'fr');
