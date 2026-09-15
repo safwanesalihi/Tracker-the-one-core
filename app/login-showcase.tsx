@@ -6,7 +6,7 @@ import { Check, Clock, FileText, Gauge, Megaphone, Send, ShieldCheck, Sparkles, 
 
 const buildSlides = (t: (text: string) => string) => [
   {
-    key: 'pilotage', eyebrow: t('PILOTAGE'), title: t('Les six nombres du studio'), caption: t('Publiés à l’heure, délai de validation, tours de retours… avec leur cible.'),
+    key: 'pilotage', eyebrow: t('TABLEAU DE BORD'), title: t('Les six nombres du studio'), caption: t('Publiés à l’heure, délai de validation, tours de retours… avec leur cible.'),
     render: () => <div className="showcase-tiles">
       {[[t('Publiés à l’heure'), '96 %', t('23 / 24 contenus'), t('Cible ≥ 95 %'), 'ok', Send], [t('Délai médian de validation'), t('14 h'), t('11 décisions explicites'), t('Cible < 24 h'), 'ok', Clock], [t('Validés par silence'), '33 %', t('4 / 12 validations tacites'), t('À surveiller > 30 %'), 'warn', Gauge]].map(([label, value, detail, target, state, Icon]) => {
         const I = Icon as typeof Send;

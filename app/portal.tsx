@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import Avatar from '@/app/profile-avatar';
 import ClientMark from '@/app/client-mark';
 import ClientImages from '@/app/client-images';
-import { type RecordItem, statuses, safeLink, channels, dayKey } from '@/lib/model';
+import { type RecordItem, type Status, statuses, safeLink, channels, dayKey } from '@/lib/model';
 import { flow, hoursLeft, revisionState, shiftDay } from '@/lib/flow';
+import { DonutStat, TrendArea, type Slice } from '@/components/dashboard-charts';
 import { Progress } from '@/components/ui/progress';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
 import { readStoredLocale } from '@/lib/i18n';
@@ -165,7 +166,14 @@ export default function Portal({ mode, records, client, user, workspaceId, route
     const quota = client.quota && /^\d+$/.test(client.quota) ? Number(client.quota) : null;
     const weekEnd = shiftDay(today, 6);
     const thisWeek = tasks.filter((t) => t.due && t.due >= today && t.due <= weekEnd && !t.publishedAt).sort((a, b) => a.due!.localeCompare(b.due!));
-    const mix = statuses.map((status) => ({ status, count: tasks.filter((t) => t.status === status).length }));
+    const statusColors: Record<Status, string> = { 'À faire': '#8e96a3', 'En cours': '#e9c46a', 'À valider': '#E5A93C', 'Validé': '#3d8763' };
+    const mixSlices: Slice[] = statuses.map((status) => ({ key: status, label: copy.status[status], value: tasks.filter((t) => t.status === status).length, color: statusColors[status] }));
+    const monthlyTrend = Array.from({ length: 6 }, (_, i) => {
+      const base = new Date(today + 'T12:00:00');
+      const d = new Date(base.getFullYear(), base.getMonth() - (5 - i), 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return { x: key, y: tasks.filter((t) => t.publishedAt && t.publishedAt.slice(0, 7) === key).length, label: d.toLocaleDateString(copy.locale, { month: 'long', year: 'numeric' }) };
+    });
     return <>
       <ClientImages client={client} workspaceId="" canEdit={false} onChange={async () => false} onError={() => undefined} />
       <div className="page-heading"><div className="eyebrow">{copy.dashboard.toUpperCase()}</div><h1>{copy.hello(who || client.name)}</h1><p>{copy.tagline}</p></div>
@@ -189,7 +197,10 @@ export default function Portal({ mode, records, client, user, workspaceId, route
             {quota ? <><strong className="portal-quota-number">{publishedThisMonth.length}<small> / {quota}</small></strong><Progress value={Math.min(100, publishedThisMonth.length / quota * 100)} /><p className="small-note">{copy.quotaText(publishedThisMonth.length, quota)} · {copy.quotaLeft(quota - publishedThisMonth.length)}</p></> : <p className="small-note">{copy.noQuota}</p>}
           </section>
           <section className="portal-card"><div className="section-head"><div><h2>{copy.statusMix}</h2></div></div>
-            <div className="portal-mix">{mix.map(({ status, count }) => <div key={status}><Chip status={status} copy={copy} /><div className="portal-mix-bar"><span style={{ width: `${tasks.length ? count / tasks.length * 100 : 0}%` }} className={`s${statuses.indexOf(status)}`} /></div><strong>{count}</strong></div>)}</div>
+            <div className="portal-mix"><DonutStat data={mixSlices} centerLabel={copy.tasks} /></div>
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.publishTrend}</h2></div></div>
+            <div className="flow-panel-body"><TrendArea data={monthlyTrend} color="#E5A93C" height={168} xTickFormatter={(x) => new Date(`${x}-01T12:00:00`).toLocaleDateString(copy.locale, { month: 'short' })} /></div>
           </section>
           <section className="portal-card"><div className="section-head"><div><h2>{copy.progressTitle}</h2></div></div>
             {projects.length ? <div className="portal-progress">{projects.map((p) => { const ts = tasks.filter((t) => t.projectId === p.id), done = ts.filter((t) => t.status === 'Validé').length; return <div key={p.id}><div className="portal-progress-head"><strong>{p.name}</strong><small>{copy.validatedOf(done, ts.length)}</small></div><Progress value={ts.length ? done / ts.length * 100 : 0} /></div>; })}</div> : <p className="small-note">{copy.noTasks}</p>}

@@ -95,6 +95,26 @@
 .flow-rules-grid strong{display:block;font-size:17px;font-weight:600;letter-spacing:-.02em;margin-bottom:4px}
 .flow-rules-grid p{font-size:12px;color:#727b88;line-height:1.7}
 
+/* Dashboard charts — donut with legend, trend area, two-series bar compare */
+.chart-tooltip{background:#fff;border:1px solid #e5e8ee;border-radius:8px;padding:9px 11px;box-shadow:0 8px 20px #16203818;font-size:12px;min-width:120px}
+.chart-tooltip strong{display:block;margin-bottom:5px;font-size:11px;color:#8c96a5;font-weight:500}
+.chart-tooltip span{display:flex;align-items:center;gap:7px;font-weight:600;color:#20232a;white-space:nowrap}
+.chart-tooltip span+span{margin-top:3px}
+.chart-tooltip i{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+.donut-stat{display:flex;align-items:center;gap:24px}
+.donut-chart{position:relative;flex-shrink:0}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.donut-center>strong{font-size:27px;font-weight:600;letter-spacing:-.04em;line-height:1.1;font-variant-numeric:tabular-nums}
+.donut-center>small{font-size:10px;color:#8c96a5;margin-top:3px}
+.donut-legend{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0}
+.donut-legend li{display:flex;align-items:center;gap:8px;font-size:12px;color:#5d6778}
+.donut-legend b{margin-left:auto;font-weight:600;color:#20232a;font-variant-numeric:tabular-nums}
+.donut-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.trend-chart,.bar-compare{width:100%}
+.chart-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-bottom:25px}
+@media (max-width:520px){.donut-stat{flex-direction:column;align-items:flex-start;gap:16px}.donut-legend{width:100%}}
+@media (max-width:1000px){.chart-row{grid-template-columns:1fr}}
+
 /* Workspace switcher & team invite */
 .workspace-switch{display:flex;flex-direction:column;gap:5px;padding:14px 9px 12px;border-bottom:1px solid #fff;font-size:11px}
 .workspace-switch select{font:inherit;font-size:12px;padding:6px 8px;border-radius:4px;border:1px solid #EDECEA;background:#fff;color:#111;max-width:100%}

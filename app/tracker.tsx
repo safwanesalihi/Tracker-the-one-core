@@ -124,6 +124,7 @@ import {
 } from "@/lib/workspace";
 import Portal from "@/app/portal";
 import FlowPage from "@/app/flow-page";
+import { DonutStat, TrendArea, type Slice } from "@/components/dashboard-charts";
 import Annex from "@/app/annex";
 import ClientMark from "@/app/client-mark";
 import ClientImages from "@/app/client-images";
@@ -2014,6 +2015,63 @@ export default function Tracker() {
             </section>
           </div>
         )}
+        {!!records.length &&
+          (() => {
+            const statusColors: Record<Status, string> = {
+              "À faire": "#8e96a3",
+              "En cours": "#e9c46a",
+              "À valider": "#E5A93C",
+              Validé: "#3d8763",
+            };
+            const statusSlices: Slice[] = statuses.map((s) => ({
+              key: s,
+              label: tr(s),
+              value: tasks.filter((t) => t.status === s).length,
+              color: statusColors[s],
+            }));
+            const weeks = Array.from({ length: 8 }, (_, i) =>
+              shiftDay(today, -7 * (7 - i)),
+            );
+            const weeklyTrend = weeks.map((weekStart) => {
+              const weekEnd = shiftDay(weekStart, 6);
+              return {
+                x: weekStart,
+                y: tasks.filter(
+                  (t) =>
+                    t.validatedAt &&
+                    dayIn(new Date(t.validatedAt)) >= weekStart &&
+                    dayIn(new Date(t.validatedAt)) <= weekEnd,
+                ).length,
+                label: `${dateLabel(weekStart)} – ${dateLabel(weekEnd)}`,
+              };
+            });
+            return (
+              <div className="chart-row">
+                <section className="work-panel">
+                  <div className="section-head">
+                    <div>
+                      <h2>{tr("Répartition des tâches")}</h2>
+                      <p>{tr("Toutes les tâches visibles, par statut.")}</p>
+                    </div>
+                  </div>
+                  <div className="flow-panel-body">
+                    <DonutStat data={statusSlices} centerLabel={tr("Tâches")} />
+                  </div>
+                </section>
+                <section className="work-panel">
+                  <div className="section-head">
+                    <div>
+                      <h2>{tr("Validations")}</h2>
+                      <p>{tr("Tâches validées, semaine par semaine.")}</p>
+                    </div>
+                  </div>
+                  <div className="flow-panel-body">
+                    <TrendArea data={weeklyTrend} color="#3d8763" height={182} xTickFormatter={dateLabel} />
+                  </div>
+                </section>
+              </div>
+            );
+          })()}
         {(() => {
           const alerts = records
             .filter(
@@ -2045,7 +2103,7 @@ export default function Tracker() {
                     onClick={() => navigate({ page: "flow" })}
                   >
                     <Gauge size={14} />
-                    {tr("Pilotage")}
+                    {tr("Tableau de bord")}
                   </button>
                 )}
               </div>
@@ -3078,7 +3136,7 @@ export default function Tracker() {
           : route.page === "team"
             ? tr("Équipe")
             : route.page === "flow"
-              ? tr("Pilotage")
+              ? tr("Tableau de bord")
               : route.page === "annex"
                 ? tr("Annexe contractuelle")
                 : client?.name || task?.name || tr("Espace");
@@ -3252,7 +3310,7 @@ export default function Tracker() {
                 {manager && (
                   <NavItem
                     icon={Gauge}
-                    label={tr("Pilotage")}
+                    label={tr("Tableau de bord")}
                     active={route.page === "flow" || route.page === "annex"}
                     badge={
                       records.filter(

@@ -4,22 +4,22 @@ The One Tracker runs **The One Flow** for the studio and its clients, without Cl
 
 ## The One Flow — what the app enforces
 
-Every rule lives in one file, [lib/flow.ts](lib/flow.ts), as pure functions with the constants at the top. The API applies them; the Pilotage page and the contract annex read them. Change a number there and the app, the receipts and the annex agree.
+Every rule lives in one file, [lib/flow.ts](lib/flow.ts), as pure functions with the constants at the top. The API applies them; the Dashboard page and the contract annex read them. Change a number there and the app, the receipts and the annex agree.
 
 | Rule | Where it bites |
 |---|---|
 | **48 h validation, silence is approval** | Sending a deliverable stores `approvalDueAt` (never recomputed). The sweep auto-validates at the deadline with a `silence` receipt, after reminders at 24 h and 6 h left. |
-| **2 consolidated revision rounds** | Each client “request changes” increments `revisionRound`; round 3+ is flagged *hors forfait* on the task, the table and Pilotage. Internal rejections are not counted. |
+| **2 consolidated revision rounds** | Each client “request changes” increments `revisionRound`; round 3+ is flagged *hors forfait* on the task, the table and the Dashboard. Internal rejections are not counted. |
 | **J−7 lock** | Creating or moving an item into the coming 7 days is refused for creatives and needs an explicit, logged override (`lockOverride`) from an admin. Past dates are backfills and stay free. |
 | **Four backward gates** | From the publish date `due`: brief validé J−14 · envoi au client J−7 · validation J−5 · prêt à publier J−1. Shown on the task page with reached / late state. |
-| **Court** (who must act) | Derived from status, never typed: Studio / Client / Terminé. Chip on every row, board card and in Pilotage; filterable. |
+| **Court** (who must act) | Derived from status, never typed: Studio / Client / Terminé. Chip on every row, board card and in the Dashboard; filterable. |
 | **Evergreen reserve** | Validated, undated, unpublished items count toward ≥ 3 per client. Dating one takes it out of the reserve. |
-| **Request bank** | The portal form creates an `À faire` task with `source: Portail` and a `request` stamp; the studio sees it on the home page and in Pilotage. |
+| **Request bank** | The portal form creates an `À faire` task with `source: Portail` and a `request` stamp; the studio sees it on the home page and in the Dashboard. |
 | **J−1 sweep / J−7 alerts** | Studio-only events for items publishing tomorrow that aren’t validated, and items inside the lock window not yet sent. |
 | **Sign-off receipt** | Every validation (explicit, silence or studio) writes `signOff` — who, e-mail, when, mode, rounds used — shown to both sides. |
 | **Single channel** | Comments on the task. Client feedback is posted as `[Retours client — tour N]`. The app sends no e-mail, SMS or WhatsApp. |
 
-### The six numbers (Pilotage page)
+### The six numbers (Dashboard page)
 
 On-time publish rate (≥ 95 %), median client validation time (< 24 h, explicit decisions only), share validated by silence (watch > 30 %), revision rounds per item (≤ 1,4), delivered vs sold (100–105 %, from each client’s `quota`), evergreen reserve (≥ 3 per client). Computed by `computeMetrics` for this month, last month or 30 days.
 
@@ -31,7 +31,7 @@ On-time publish rate (≥ 95 %), median client validation time (< 24 h, explicit
 
 ### Roles and the client portal
 
-Roles: **owner** (unique — the `OWNER_EMAIL` account), **admin** (optional delegated manager: everything but the owner role and client creation), **member** (`creative`: moves forward the tasks assigned to them or not yet assigned — enforced server-side by `memberView` — comments, edits existing clients and manages sub-projects, sees the team read-only; does not create tasks, has no Pilotage, cannot archive or act as the client in the portal preview), **viewer** (read-only, legacy), and **client**. `owner · admin · viewer` see the whole studio. A **`client`** member is scoped to one client (`workspace_members.client_id`) and only ever sees the portal: home, à valider, calendrier, livrables, demande and the review page with the countdown. Internal fields (assignee, source, reminders, studio links) are stripped server-side (`portalView`). Clients can approve, request changes, comment and submit requests — nothing else.
+Roles: **owner** (unique — the `OWNER_EMAIL` account), **admin** (optional delegated manager: everything but the owner role and client creation), **member** (`creative`: moves forward the tasks assigned to them or not yet assigned — enforced server-side by `memberView` — comments, edits existing clients and manages sub-projects, sees the team read-only; does not create tasks, has no Dashboard, cannot archive or act as the client in the portal preview), **viewer** (read-only, legacy), and **client**. `owner · admin · viewer` see the whole studio. A **`client`** member is scoped to one client (`workspace_members.client_id`) and only ever sees the portal: home, à valider, calendrier, livrables, demande and the review page with the countdown. Internal fields (assignee, source, reminders, studio links) are stripped server-side (`portalView`). Clients can approve, request changes, comment and submit requests — nothing else.
 
 **Languages**: the whole app — studio, client portal, sign-in and the contract annex — is available in French, English and Arabic (RTL). The FR / EN / AR toggle lives in each person’s settings (click your picture in the sidebar) and on the sign-in screen; the choice is remembered per browser (`the-one.locale`). A client who never chose a language starts in the language recorded on their client file. French is the source language: UI strings are translated through `lib/i18n` (English and Arabic dictionaries keyed by the French text, so an untranslated string falls back to French rather than breaking); the portal keeps its structured copy in `lib/portal-i18n.ts`. Data (task names, briefs, comments) is shown as typed. Invitation e-mails are still sent in French.
 

@@ -6,7 +6,8 @@ import { useI18n } from '@/app/locale-provider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type RecordItem } from '@/lib/model';
-import { computeMetrics, courtOf, flow, monthPeriod, shiftDay, type Court, type Metrics } from '@/lib/flow';
+import { computeMetrics, courtOf, dayIn, flow, monthPeriod, shiftDay, type Court, type Metrics } from '@/lib/flow';
+import { DonutStat, TrendArea, BarCompare, type Slice } from '@/components/dashboard-charts';
 
 type Props = {
   records: RecordItem[];
@@ -57,17 +58,32 @@ export default function FlowPage({ records, today, busy, onOpenTask, onOpenClien
   const Icon = (type?: RecordItem['type']) => type === 'auto-approved' ? CheckCircle2 : type === 'reminder' ? Bell : type === 'sweep' ? AlertTriangle : type === 'lock' ? Lock : type === 'request' ? Inbox : Send;
   const periodLabel = `${new Date(period.from + 'T12:00:00').toLocaleDateString(tag, { day: 'numeric', month: 'short' })} → ${new Date(period.to + 'T12:00:00').toLocaleDateString(tag, { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
+  const days: string[] = []; for (let d = period.from; d <= period.to; d = shiftDay(d, 1)) days.push(d);
+  const trend = days.map((day) => ({ x: day, y: tasks.filter((item) => item.publishedAt && dayIn(new Date(item.publishedAt)) === day).length, label: new Date(day + 'T12:00:00').toLocaleDateString(tag, { day: 'numeric', month: 'short' }) }));
+  const courtColors: Record<Court, string> = { studio: '#20232a', client: '#E5A93C', done: '#3d8763' };
+  const courtSlices: Slice[] = (['studio', 'client', 'done'] as Court[]).map((court) => ({ key: court, label: t(court === 'studio' ? 'Studio' : court === 'client' ? 'Client' : 'Terminé'), value: byCourt(court).length, color: courtColors[court] }));
+  const compareData = metrics.clients.filter((c) => c.quota).sort((a, b) => (b.quota ?? 0) - (a.quota ?? 0)).slice(0, 10).map((c) => ({ key: c.clientId, label: c.name, a: c.quota ?? 0, b: c.delivered }));
+
   return <div className="flow-page">
-    <div className="page-heading"><span className="page-symbol" aria-hidden="true"><Gauge size={22} /></span><div className="heading-line"><h1>{t('Pilotage')}</h1><div className="inline"><Tabs value={periodKey} onValueChange={setPeriodKey}><TabsList><TabsTrigger value="month">{t('Ce mois')}</TabsTrigger><TabsTrigger value="previous">{t('Mois précédent')}</TabsTrigger><TabsTrigger value="30">{t('30 jours')}</TabsTrigger></TabsList></Tabs><button className="btn" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />{t('Actualiser')}</button></div></div><p>{t('Les six nombres de The One Flow ·')}{' '}{periodLabel}</p></div>
+    <div className="page-heading"><span className="page-symbol" aria-hidden="true"><Gauge size={22} /></span><div className="heading-line"><h1>{t('Tableau de bord')}</h1><div className="inline"><Tabs value={periodKey} onValueChange={setPeriodKey}><TabsList><TabsTrigger value="month">{t('Ce mois')}</TabsTrigger><TabsTrigger value="previous">{t('Mois précédent')}</TabsTrigger><TabsTrigger value="30">{t('30 jours')}</TabsTrigger></TabsList></Tabs><button className="btn" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />{t('Actualiser')}</button></div></div><p>{t('Les six nombres de The One Flow ·')}{' '}{periodLabel}</p></div>
 
     <div className="metric-grid flow-tiles">{tiles(metrics, t).map((tile) => <div className={`metric-card flow-tile ${tile.ok === null ? '' : tile.ok ? 'ok' : 'warn'}`} key={tile.label}><div className="metric-label"><span>{tile.label}</span><span className="metric-icon">{createElement(tile.icon, { size: 18 })}</span></div><strong>{tile.value}</strong><small>{tile.detail}</small><span className="flow-target">{t('Cible {target}', { target: tile.target })}</span></div>)}</div>
 
-    <div className="flow-grid">
+    <div className="chart-row">
+      <section className="work-panel">
+        <div className="section-head"><div><h2>{t('Volume publié')}</h2><p>{t('Contenus publiés par jour ·')}{' '}{periodLabel}</p></div></div>
+        <div className="flow-panel-body"><TrendArea data={trend} color="#E5A93C" height={182} xTickFormatter={(x) => new Date(`${x}T12:00:00`).toLocaleDateString(tag, { day: 'numeric', month: 'short' })} /></div>
+      </section>
       <section className="work-panel">
         <div className="section-head"><div><h2>{t('Dans quel camp ?')}<span className="neutral-badge">{tasks.filter((item) => courtOf(item) !== 'done').length}</span></h2><p>{t('Qui doit agir maintenant, tâche par tâche.')}</p></div></div>
-        <div className="flow-panel-body"><div className="flow-courts">{(['studio', 'client', 'done'] as Court[]).map((court) => <div key={court}><span className={`court ${court}`}><i />{t(court === 'studio' ? 'Studio' : court === 'client' ? 'Client' : 'Terminé')}</span><strong>{byCourt(court).length}</strong></div>)}</div>
-        {!!overBudget.length && <div className="flow-warning"><AlertTriangle size={15} /><span>{overBudget.length === 1 ? t('1 contenu hors forfait (plus de {n} tours). Accord du propriétaire requis avant reprise.', { n: flow.maxRevisionRounds }) : t('{c} contenus hors forfait (plus de {n} tours). Accord du propriétaire requis avant reprise.', { c: overBudget.length, n: flow.maxRevisionRounds })}</span></div>}</div>
-        <div className="flow-subhead"><span>{t('Chez le client')}</span><span className="neutral-badge">{byCourt('client').length}</span></div>
+        <div className="flow-panel-body"><DonutStat data={courtSlices} centerLabel={t('Tâches')} /></div>
+      </section>
+    </div>
+
+    <div className="flow-grid">
+      <section className="work-panel">
+        <div className="section-head"><div><h2>{t('Chez le client')}<span className="neutral-badge">{byCourt('client').length}</span></h2><p>{t('Qui doit agir maintenant, tâche par tâche.')}</p></div></div>
+        {!!overBudget.length && <div className="flow-panel-body"><div className="flow-warning"><AlertTriangle size={15} /><span>{overBudget.length === 1 ? t('1 contenu hors forfait (plus de {n} tours). Accord du propriétaire requis avant reprise.', { n: flow.maxRevisionRounds }) : t('{c} contenus hors forfait (plus de {n} tours). Accord du propriétaire requis avant reprise.', { c: overBudget.length, n: flow.maxRevisionRounds })}</span></div></div>}
         <div className="task-rows">{byCourt('client').slice(0, 8).map((item) => <button className="task-line" key={item.id} onClick={() => onOpenTask(item.id)}><span className="task-line-icon"><Clock size={16} /></span><span className="task-line-name"><strong>{item.name}</strong><small>{cname(item.clientId)}{' '}{t('· tacite le {when}', { when: item.approvalDueAt ? when(item.approvalDueAt) : '—' })}</small></span><span className="court client"><i />{t('Client')}</span><ChevronRight size={15} /></button>)}{!byCourt('client').length && <p className="small-note flow-empty">{t('Rien n’attend le client.')}</p>}</div>
       </section>
 
@@ -79,6 +95,7 @@ export default function FlowPage({ records, today, busy, onOpenTask, onOpenClien
 
     <section className="work-panel flow-table">
       <div className="section-head"><div><h2>{t('Par client')}</h2><p>{t('Vendu, livré et réserve evergreen sur la période.')}</p></div>{!!requests.length && <span className="neutral-badge">{requests.length === 1 ? t('1 demande à planifier') : t('{n} demandes à planifier', { n: requests.length })}</span>}</div>
+      {!!compareData.length && <div className="flow-panel-body"><BarCompare data={compareData} aLabel={t('Vendu / mois')} bLabel={t('Publiés')} height={214} /></div>}
       <div className="table-area"><Table className="flow-client-table"><TableHeader><TableRow><TableHead>{t('Client')}</TableHead><TableHead>{t('Vendu / mois')}</TableHead><TableHead>{t('Publiés')}</TableHead><TableHead>{t('Livré vs vendu')}</TableHead><TableHead>{t('Chez le client')}</TableHead><TableHead>{t('Réserve evergreen')}</TableHead></TableRow></TableHeader>
         <TableBody>{metrics.clients.map((c) => <TableRow key={c.clientId}><TableCell><button className="table-name" onClick={() => onOpenClient(c.clientId)}>{c.name}</button></TableCell><TableCell>{c.quota ?? <span className="small-note">{t('À renseigner')}</span>}</TableCell><TableCell>{c.delivered}</TableCell><TableCell><span className={`flow-value ${c.ratio !== null && (c.ratio < flow.targets.deliveredVsSold[0] || c.ratio > flow.targets.deliveredVsSold[1]) ? 'off' : c.ratio !== null ? 'ok' : ''}`}>{pct(c.ratio)}</span></TableCell><TableCell>{byCourt('client').filter((item) => item.clientId === c.clientId).length}</TableCell><TableCell><span className={`flow-value ${c.evergreen < flow.targets.evergreen ? 'off' : 'ok'}`}>{c.evergreen} / {flow.targets.evergreen}</span></TableCell></TableRow>)}</TableBody></Table></div>
       {!clients.length && <p className="small-note flow-empty">{t('Ajoutez un client pour suivre ces nombres.')}</p>}
