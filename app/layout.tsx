@@ -3,7 +3,6 @@ import "./globals.css";
 import "./modern.css";
 import "./team.css";
 import "./login.css";
-import "./task-draft.css";
 import "./date-picker.css";
 import "./flow.css";
 import { LocaleProvider } from "./locale-provider";

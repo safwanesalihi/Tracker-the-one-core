@@ -243,6 +243,8 @@ export const ar: Record<string, string> = {
   'S’applique immédiatement, sur cet appareil.': 'تُطبق فورًا على هذا الجهاز.',
   'Image introuvable.': 'الصورة غير موجودة.',
   'Actions': 'إجراءات',
+  'Réunion, WhatsApp… ou un lien https://': 'اجتماع، واتساب… أو رابط https://',
+  'L’origine de la demande, ou le lien du brief, du message ou de la demande client.': 'مصدر الطلب، أو رابط الملخص أو الرسالة أو طلب العميل.',
   'Espace': 'المساحة',
   'Espace inconnu.': 'مساحة غير معروفة.',
   'Exemple fictif · à remplacer avant utilisation réelle': 'مثال افتراضي · يُستبدل قبل الاستعمال الفعلي',

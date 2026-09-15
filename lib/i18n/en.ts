@@ -244,6 +244,8 @@ export const en: Record<string, string> = {
   'S’applique immédiatement, sur cet appareil.': 'Applies immediately, on this device.',
   'Image introuvable.': 'Image not found.',
   'Actions': 'Actions',
+  'Réunion, WhatsApp… ou un lien https://': 'Meeting, WhatsApp… or an https:// link',
+  'L’origine de la demande, ou le lien du brief, du message ou de la demande client.': 'Where the request came from, or the link to the brief, message or client request.',
   'Espace': 'Workspace',
   'Espace inconnu.': 'Unknown workspace.',
   'Exemple fictif · à remplacer avant utilisation réelle': 'Fictional example · replace before real use',
