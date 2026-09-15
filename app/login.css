@@ -1,0 +1,84 @@
+.google-login .google-btn { margin-top: 32px; min-height: 48px; font-size: 14px; color: #1f1f1f; background: #fff; border: 1px solid #747775; border-radius: 4px; }
+.google-login .google-btn:disabled { opacity: .55; cursor: not-allowed; }
+.google-login .google-btn img { width: 20px; height: 20px; object-fit: contain; }
+.google-login .google-login-note { font-size: 14px; line-height: 1.7; color: inherit; opacity: .75; margin-top: 17px; }
+.google-login .auth-privacy { align-items: flex-start; line-height: 1.7; font-size: 12px; }
+.google-login .auth-privacy svg { flex-shrink: 0; margin-top: 3px; }
+.auth-setup { width: 100%; background: #fffaed; border: 1px solid #e6d6a4; border-radius: 9px; margin-top: 24px; padding: 17px; color: #64501c; }
+.auth-setup strong { font-size: 14px; }
+.auth-setup p { font-size: 14px; line-height: 1.6; margin: 7px 0 13px; color: #756639; }
+.auth-setup .text-link { font-size: 14px; }
+.auth-preview-card h3 { font-size: 18px; margin-top: 17px; }
+.auth-preview-card p { font-size: 14px; line-height: 1.7; margin-top: 9px; }
+
+/* E-mail + password form on the dark auth panel */
+.auth-password { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 26px; }
+.auth-mode { display: grid; grid-template-columns: 1fr 1fr; background: #ffffff10; border: 1px solid #ffffff1c; border-radius: 8px; padding: 3px; margin-bottom: 4px; }
+.auth-mode button { min-height: 34px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #b9c1cc; background: transparent; border: 0; }
+.auth-mode button.active { background: #fff; color: #111; }
+.auth-password label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #a5afbd; }
+.auth-password input { height: 43px; background: #ffffff0d; border: 1px solid #ffffff24; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+.auth-password input::placeholder { color: #ffffff59; font-size: 13px; }
+.auth-password input:focus { border-color: #E5A93C; background: #ffffff14; }
+.auth-password input:-webkit-autofill { -webkit-text-fill-color: #fff; -webkit-box-shadow: 0 0 0 1000px #262a33 inset; }
+.auth-code-toggle { align-self: flex-start; color: #b9c1cc; font-size: 12px; }
+.auth-submit { min-height: 46px; margin-top: 4px; font-size: 14px; }
+.auth-divider { width: 100%; display: flex; align-items: center; gap: 12px; margin-top: 22px; color: #6b7482; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #ffffff1c; }
+.google-login .google-btn { margin-top: 18px; }
+.google-login .form-error { margin-top: 14px; color: #f2b5ad; }
+
+/* Layout: the form column keeps a fixed, readable width on wide screens; the showcase takes the rest. */
+@media (min-width: 1000px) {
+  .auth-screen { grid-template-columns: minmax(460px, 600px) minmax(0, 1fr); }
+  .auth-form { max-width: 520px; margin: auto; }
+  .auth-preview { width: min(760px, 88%); }
+}
+@media (min-width: 1500px) {
+  .auth-screen { grid-template-columns: 640px minmax(0, 1fr); }
+  .auth-preview { width: min(820px, 80%); }
+}
+.auth-preview h2 { font-size: 34px; margin: 0 0 26px; }
+
+/* Showcase */
+.showcase { display: flex; flex-direction: column; gap: 18px; }
+.showcase-frame { background: #fff; color: #111; border-radius: 14px; box-shadow: 0 30px 60px #0006, 0 0 0 1px #ffffff14; overflow: hidden; animation: showcase-in .45s ease both; }
+@keyframes showcase-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+.showcase-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: #f5f6f8; border-bottom: 1px solid #e5e8ee; }
+.showcase-bar span { width: 9px; height: 9px; border-radius: 50%; background: #dfe3ea; }
+.showcase-bar span:first-child { background: #E5A93C; }
+.showcase-bar small { margin-left: 10px; font-size: 11px; color: #8e96a3; letter-spacing: .04em; }
+.showcase-body { padding: 20px; min-height: 230px; display: flex; flex-direction: column; justify-content: center; }
+.showcase-copy .eyebrow { color: #b9a26b; }
+.showcase-copy h3 { font-size: 19px; font-weight: 600; color: #fff; margin: 0 0 6px; }
+.showcase-copy p { color: #9fa5b0 !important; font-size: 13px !important; line-height: 1.7; margin: 0 !important; }
+.showcase-dots { display: flex; gap: 8px; }
+.showcase-dots button { width: 22px; height: 4px; border-radius: 2px; background: #ffffff33; border: 0; padding: 0; transition: background .2s, width .2s; }
+.showcase-dots button.active { background: #E5A93C; width: 34px; }
+
+/* Slides reuse app components; only sizing is adjusted here. */
+.showcase-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.showcase-tiles .flow-tile { padding: 14px 16px; box-shadow: none; }
+.showcase-tiles .flow-tile strong { font-size: 24px; }
+.showcase-tiles .flow-tile small, .showcase-tiles .flow-target { font-size: 11px; }
+.showcase-rows .task-line { padding: 11px 6px; }
+.showcase-rows .task-line-name strong { font-size: 13px; }
+.showcase-rows .due { font-size: 12px; color: #6b7280; margin-left: 4px; white-space: nowrap; }
+.showcase-gates { margin: 0; }
+.showcase-gates > div { padding: 12px 10px; }
+.showcase-portal { display: flex; flex-direction: column; gap: 10px; }
+.showcase-portal-head { display: flex; flex-direction: column; gap: 4px; }
+.showcase-portal-head strong { font-size: 18px; letter-spacing: -.02em; }
+.showcase-portal-head small { color: #6b7280; }
+.showcase-portal .portal-clock { margin: 4px 0 0; }
+.showcase-portal .portal-rounds { margin: 0; }
+.showcase-portal .btn { pointer-events: none; }
+.showcase-receipt { display: flex; flex-direction: column; gap: 14px; }
+.showcase-receipt .receipt { margin: 0; }
+.showcase-flags { display: flex; gap: 8px; flex-wrap: wrap; }
+.showcase-flags .flag-pill { margin: 0; font-size: 11px; padding: 4px 9px; }
+@media (max-width: 999px) {
+  .auth-flow { padding: 32px 22px; }
+  .showcase-tiles { grid-template-columns: 1fr; }
+  .showcase-gates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

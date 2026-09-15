@@ -1,0 +1,37 @@
+.team-page .team-toolbar { flex-wrap: wrap; gap: 18px; }
+.team-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.team-filters .search-input { width: 220px; max-width: 100%; }
+.team-filters .pick { min-width: 155px; }
+.team-members-table th { padding: 12px 22px; background: #fafbfd; font-size: 11px; color: #697587; font-weight: 500; }
+.team-members-table td { padding: 16px 22px; font-size: 12px; }
+.team-members-table tr { border-color: #eff1f5; }
+.team-person { display: flex; align-items: center; gap: 12px; min-width: 180px; }
+.team-person .member-identity { max-width: 340px; }
+.team-person .member-identity strong, .team-person .member-identity small { overflow-wrap: anywhere; white-space: normal; }
+.team-person .member-identity small { color: #707d8d; }
+.team-role-label { display: inline-flex; border: 1px solid #e5e8ee; padding: 4px 9px; border-radius: 6px; font-size: 11px; color: #556276; background: #fafbfd; }
+.team-date { white-space: nowrap; color: #707d8d; }
+.team-member-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.team-actions-heading { text-align: right; }
+.team-access-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #697587; white-space: nowrap; }
+.team-remove { color: #aa3d36; }
+.team-remove:hover { background: #fff1ef; }
+.team-permissions { margin-top: 14px; }
+.team-permissions > div { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid #eff1f5; }
+.team-permissions svg { color: #b27e28; margin-top: 2px; flex-shrink: 0; }
+.team-permissions strong { font-size: 12px; color: #465367; font-weight: 500; }
+.team-permissions p { font-size: 12px; line-height: 1.7; color: #707d8d; margin-top: 4px; }
+.team-modal .team-role-description { color: #707d8d; font-size: 13px; line-height: 1.7; margin: 12px 0 20px; }
+.team-modal .team-confirm-remove { background: #aa3d36; color: #fff; }
+.team-modal .team-confirm-remove:hover { background: #8f302b; }
+.team-page button:disabled, .team-modal button:disabled { cursor: not-allowed; opacity: .5; }
+@media (max-width: 900px) {
+  .team-members-table .team-date { display: none; }
+  .team-members-table th, .team-members-table td { padding: 12px 15px; }
+}
+@media (max-width: 600px) {
+  .team-filters, .team-filters .search-input { width: 100%; }
+  .team-person { min-width: 150px; }
+  .team-member-actions { flex-wrap: wrap; }
+  .team-summary span { min-height: 27px; }
+}

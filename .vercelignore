@@ -1,0 +1,10 @@
+# Local-only artefacts; never part of a deployment.
+.data
+.sites-runtime
+.next
+.env
+.env.*
+!.env.example
+tests
+CONSISTENCY-REVIEW.md
+.claude
