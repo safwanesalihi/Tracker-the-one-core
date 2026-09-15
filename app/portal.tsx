@@ -10,6 +10,7 @@ import { Sidebar, SidebarProvider, SidebarHeader, SidebarContent, SidebarFooter,
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Avatar from '@/app/profile-avatar';
 import ClientMark from '@/app/client-mark';
+import ClientImages from '@/app/client-images';
 import { type RecordItem, statuses, safeLink, channels, dayKey } from '@/lib/model';
 import { flow, hoursLeft, revisionState, shiftDay } from '@/lib/flow';
 import { Progress } from '@/components/ui/progress';
@@ -161,6 +162,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
     const thisWeek = tasks.filter((t) => t.due && t.due >= today && t.due <= weekEnd && !t.publishedAt).sort((a, b) => a.due!.localeCompare(b.due!));
     const mix = statuses.map((status) => ({ status, count: tasks.filter((t) => t.status === status).length }));
     return <>
+      <ClientImages client={client} workspaceId="" canEdit={false} onChange={async () => false} onError={() => undefined} />
       <div className="page-heading"><div className="eyebrow">{copy.dashboard.toUpperCase()}</div><h1>{copy.hello(who || client.name)}</h1><p>{copy.tagline}</p></div>
       <div className={`portal-banner ${waiting.length ? 'active' : ''}`}><CheckCircle2 size={18} /><span>{waiting.length ? copy.waiting(waiting.length) : copy.nothingWaiting}</span>{!!waiting.length && <button className="btn primary" onClick={() => go('review')}>{copy.review}</button>}</div>
       <div className="portal-stats portal-stats-4">{[[copy.inProduction, production.length], [copy.review, waiting.length], [copy.validatedThisMonth, validatedThisMonth.length], [copy.publishedThisMonth, publishedThisMonth.length]].map(([label, value]) => <div key={String(label)}><span>{label}</span><strong>{String(value).padStart(2, '0')}</strong></div>)}</div>

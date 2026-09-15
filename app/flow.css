@@ -322,3 +322,14 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 .user-row .user-profile:hover,.user-row .user-profile:focus-visible{background:#ffffff0f;outline:none}
 .user-row .user-profile>div{flex:1;min-width:0}
 .portal-rtl .user-row .user-profile{text-align:right}
+
+/* Portal sidebar: the client card (logo or initials, name, portal label) sits under the studio logo. */
+.portal-root .brand>.brand-client,[data-slot=sidebar][data-mobile=true] .brand>.brand-client{flex-direction:row;align-items:center;gap:12px;width:100%;margin-top:4px;padding:10px 12px;border-radius:12px;background:#ffffff0a;border:1px solid #ffffff12}
+.brand-client>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand-client .client-mark-md{width:40px;height:40px;border-radius:10px;flex:none}
+.brand-client strong{color:#fff;font-size:14px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand-client small{color:#9aa0ab;font-size:11px}
+/* Portal home hero: same banner and mark as the studio's client overview, read-only. */
+.portal-root .client-hero{margin:-6px 0 22px}
+.portal-rtl .client-hero-mark{margin:-44px 26px 0 0}
+@media (max-width:700px){.portal-rtl .client-hero-mark{margin-right:16px}}
