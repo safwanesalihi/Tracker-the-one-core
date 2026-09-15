@@ -26,7 +26,7 @@ On-time publish rate (≥ 95 %), median client validation time (< 24 h, explicit
 ### Clocks
 
 - **Lazily**: every authenticated read or write runs the sweep for that workspace first, so the app is correct even with no scheduler.
-- **Vercel Cron**: [vercel.json](vercel.json) calls `GET /api/flow/sweep` every 15 minutes; Vercel sends `Authorization: Bearer $CRON_SECRET` automatically once `CRON_SECRET` is set in the project. (The Hobby plan only runs crons daily — the lazy sweep still keeps the app correct; reminders may then wait for the next visit.)
+- **Vercel Cron**: [vercel.json](vercel.json) calls `GET /api/flow/sweep` once a day at 06:00 UTC (the most the Hobby plan allows); Vercel sends `Authorization: Bearer $CRON_SECRET` automatically once `CRON_SECRET` is set in the project. On Pro, change the schedule to `*/15 * * * *`. The lazy sweep keeps the app correct in between; a daily cron only means reminders can wait until the next visit or the next morning.
 - Any other scheduler can call the same route with the same bearer token.
 
 ### Roles and the client portal
