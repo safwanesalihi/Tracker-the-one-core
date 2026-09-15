@@ -72,5 +72,29 @@ await mutate({ action: 'update', kind: 'client', id: client.id, revision: 3, dat
 eq((await get(banner)).status, 404, 'removed banner dropped');
 eq((await pg.query('SELECT count(*)::int AS n FROM assets')).rows[0].n, 2, 'only the live logo and the first unattached upload remain');
 
+// Profile pictures: any member (a client included) sets their own; replaced pictures are dropped; visible to any signed-in user.
+const contact = { userId: 'contact', fullName: 'Amina', displayName: 'Amina', email: 'amina@client.test' };
+await pg.query("INSERT INTO users (id, name, email, password_hash) VALUES ('contact', 'Amina', 'amina@client.test', 'x')");
+await pg.query("INSERT INTO workspace_members (workspace_id, user_id, role, name, email, client_id) VALUES ($1, 'contact', 'client', 'Amina', 'amina@client.test', $2)", [WS, client.id]);
+globalThis.testUser = contact;
+eq((await send('logo', new File([png], 'x.png', { type: 'image/png' }))).status, 403, 'clients cannot upload client images');
+const avatar1 = (await send('avatar', new File([png], 'me.png', { type: 'image/png' }))).data.id;
+eq(typeof avatar1, 'string', 'clients can upload their own picture');
+eq((await mutate({ action: 'update-profile', avatar: 'nope' })).status, 400, 'picture id validated');
+const withAvatar = await (await mutate({ action: 'update-profile', avatar: avatar1 })).json();
+eq(withAvatar.user.avatar, avatar1);
+const avatar2 = (await send('avatar', new File([png], 'me2.png', { type: 'image/png' }))).data.id;
+await mutate({ action: 'update-profile', avatar: avatar2, name: 'Amina Benali' });
+eq((await get(avatar1)).status, 404, 'replaced picture dropped');
+globalThis.testUser = outsider;
+eq((await get(avatar2)).status, 200, 'pictures are visible to any signed-in user');
+globalThis.testUser = owner;
+const roster = await (await records.GET(new Request(origin + '/api/records', { headers: { 'X-Workspace-Id': WS } }))).json();
+eq([roster.members.find((m) => m.userId === 'contact').avatar, roster.members.find((m) => m.userId === 'contact').name], [avatar2, 'Amina Benali'], 'roster carries the picture and the new name');
+globalThis.testUser = contact;
+await mutate({ action: 'update-profile', avatar: null });
+eq((await get(avatar2)).status, 404, 'removed picture dropped');
+globalThis.testUser = owner;
+
 await pg.close();
-console.log(`${checks} client image checks passed: upload rules, member-only serving, replacement cleanup.`);
+console.log(`${checks} image checks passed: upload rules, member-only serving, replacement cleanup, profile pictures.`);

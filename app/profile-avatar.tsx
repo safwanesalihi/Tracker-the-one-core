@@ -2,6 +2,9 @@
 
 import { initials } from '@/lib/model';
 
-export default function Avatar({ name = '?' }: { name?: string }) {
-  return <span className="avatar" title={name}>{initials(name || '?')}</span>;
+/** A person's mark: their profile picture when they set one, otherwise their initials. */
+export default function Avatar({ name = '?', avatar, className = '' }: { name?: string; avatar?: string | null; className?: string }) {
+  return <span className={`avatar ${avatar ? 'has-photo' : ''} ${className}`} title={name}>
+    {avatar ? <img src={`/api/assets/${avatar}`} alt="" /> : initials(name || '?')}
+  </span>;
 }

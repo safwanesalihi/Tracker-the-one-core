@@ -150,7 +150,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
             const own = member.userId === currentUserId;
             const editable = allowed && member.role !== 'owner' && !own;
             return <TableRow key={member.userId}>
-              <TableCell><div className="team-person"><Avatar name={name} /><div className="member-identity">
+              <TableCell><div className="team-person"><Avatar name={name} avatar={member.avatar} /><div className="member-identity">
                 <strong>{name} {own && <span className="neutral-badge">{t('Vous')}</span>}{member.pending && <span className="neutral-badge"><Mail size={10} />{' '}{t('En attente de première connexion')}</span>}</strong>
                 <small>{member.role === 'client' ? t('Portail · {client}', { client: clientName(member.clientId) ?? '' }) : member.email || t(roleLabels[member.role])}{allowed && member.lastLoginAt ? t(' · dernière connexion {when}', { when: when(member.lastLoginAt) ?? '' }) : ''}</small>
               </div></div></TableCell>

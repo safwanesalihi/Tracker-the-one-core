@@ -345,3 +345,21 @@ tr:hover .row-actions,.row-actions:focus-within{opacity:1}
 /* Studio in RTL (Arabic): tables, headings and rows read from the right. */
 [dir=rtl] .task-table th,[dir=rtl] .task-table td,[dir=rtl] .properties,[dir=rtl] .page-heading,[dir=rtl] .section-head,[dir=rtl] .metric-card,[dir=rtl] .client-card,[dir=rtl] .form-field{text-align:right}
 [dir=rtl] .text-link.back svg,[dir=rtl] .topbar>svg{transform:scaleX(-1)}
+/* Personal settings dialog (photo, name, language, sign-out). */
+.settings-dialog .settings-section{padding:16px 0;border-top:1px solid #eceff4;display:grid;gap:12px}
+.settings-dialog .settings-section:first-of-type{border-top:0;padding-top:4px}
+.settings-dialog .settings-photo{grid-template-columns:auto 1fr;align-items:center;gap:18px}
+.settings-dialog .settings-photo p,.settings-dialog .settings-language p{color:#707b8c;font-size:12px;margin:2px 0 10px}
+.settings-dialog .settings-language{grid-template-columns:1fr auto;align-items:center}
+.settings-dialog .settings-language strong{display:inline-flex;align-items:center;gap:6px}
+.settings-dialog .settings-language .language-switch{padding:0;color:#69717e}
+.settings-dialog .settings-language .language-switch button{border-color:#e2e6ed;color:#69717e}
+.settings-dialog .settings-language .language-switch button.active{background:#1c1e23;border-color:#1c1e23;color:#fff}
+.settings-dialog .settings-signout{padding-bottom:0}
+.settings-dialog .settings-actions{align-items:center}
+.avatar.has-photo{background:#e9ecf1;color:transparent;overflow:hidden}
+.avatar.has-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar.avatar-xl{width:84px;height:84px;border-radius:22px;font-size:24px;flex:none}
+.user-row .user-profile .avatar{flex:none}
+.user-row .user-settings-icon{color:#737b88;flex:none;margin-inline-start:auto}
+.user-row .user-profile:hover .user-settings-icon{color:#fff}

@@ -91,7 +91,7 @@ async function workspaceFor(user: AppUser, requestedId?: string | null): Promise
 
 async function members(workspaceId: string, withState = false) {
   return database().query<WorkspaceMember>(
-    `SELECT wm.user_id AS "userId", wm.role, wm.name, wm.email, wm.client_id AS "clientId", wm.created_at AS "createdAt"${withState
+    `SELECT wm.user_id AS "userId", wm.role, wm.name, wm.email, wm.client_id AS "clientId", wm.created_at AS "createdAt", u.avatar${withState
       ? ', (u.must_change_password AND u.last_login_at IS NULL) AS "pending", u.last_login_at AS "lastLoginAt"' : ''}
      FROM workspace_members wm LEFT JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = $1
      ORDER BY CASE WHEN wm.role = 'owner' THEN 0 WHEN wm.role = 'client' THEN 2 ELSE 1 END, wm.created_at ASC, wm.user_id ASC`,
@@ -128,7 +128,7 @@ async function payload(workspace: WorkspaceContext, user: AppUser, rows?: Record
   const roster = workspace.role === 'client' ? [] : await members(workspace.id, canManageMembers(workspace.role));
   return {
     records: visibleTo(workspace, rows, user),
-    user: { id: user.userId, name: user.fullName || user.displayName, email: user.email },
+    user: { id: user.userId, name: user.fullName || user.displayName, email: user.email, avatar: user.avatar },
     workspace,
     // Members get the roster for display only: no e-mails but their own.
     members: canManageMembers(workspace.role) ? roster : roster.map((m) => ({ ...m, email: m.userId === user.userId ? m.email : null })),
@@ -443,13 +443,30 @@ export async function POST(req: Request) {
     // ----- own profile: the display name used in greetings, comments and receipts -----
 
     if (body.action === 'update-profile') {
+      // Name and/or picture. The picture is an uploaded 'avatar' asset id (null removes it); replaced pictures are dropped.
+      const wantsName = body.name !== undefined, wantsAvatar = body.avatar !== undefined;
       const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
-      if (name.length < 2 || name.length > 80) return response({ error: 'Indiquez un nom (2 à 80 caractères).' }, 400);
+      if (wantsName && (name.length < 2 || name.length > 80)) return response({ error: 'Indiquez un nom (2 à 80 caractères).' }, 400);
+      const avatar = body.avatar === null || body.avatar === '' ? null : typeof body.avatar === 'string' && /^[0-9a-f-]{36}$/.test(body.avatar) ? body.avatar : undefined;
+      if (wantsAvatar && avatar === undefined) return response({ error: 'Image introuvable.' }, 400);
+      if (!wantsName && !wantsAvatar) return response({ error: 'Requête invalide.' }, 400);
+      const current = (await db.query<{ avatar: string | null }>('SELECT avatar FROM users WHERE id = $1', [user.userId]))[0];
+      if (wantsAvatar && avatar) {
+        const owned = (await db.query<{ id: string }>("SELECT id FROM assets WHERE id = $1 AND kind = 'avatar' AND created_by = $2", [avatar, user.userId]))[0];
+        if (!owned) return response({ error: 'Image introuvable.' }, 400);
+      }
       await db.transaction(async (tx) => {
-        await tx.query('UPDATE users SET name = $2 WHERE id = $1', [user.userId, name]);
-        await tx.query('UPDATE workspace_members SET name = $2 WHERE user_id = $1', [user.userId, name]);
+        if (wantsName) {
+          await tx.query('UPDATE users SET name = $2 WHERE id = $1', [user.userId, name]);
+          await tx.query('UPDATE workspace_members SET name = $2 WHERE user_id = $1', [user.userId, name]);
+        }
+        if (wantsAvatar) {
+          await tx.query('UPDATE users SET avatar = $2 WHERE id = $1', [user.userId, avatar]);
+          if (current?.avatar && current.avatar !== avatar) await tx.query('DELETE FROM assets WHERE id = $1', [current.avatar]);
+        }
       });
-      return result({ user: { id: user.userId, name, email: user.email } });
+      const fresh: AppUser = { ...user, fullName: wantsName ? name : user.fullName, displayName: wantsName ? name : user.displayName, avatar: wantsAvatar ? avatar! : current?.avatar ?? null };
+      return response({ ...(await payload(workspace, fresh)), user: { id: fresh.userId, name: fresh.fullName || fresh.displayName, email: fresh.email, avatar: fresh.avatar } });
     }
 
     if (body.action === 'mark-read') {

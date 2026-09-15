@@ -5,7 +5,7 @@ import { database } from '@/lib/database';
 import { readSessionSettings } from '@/lib/auth-settings';
 import { hashToken } from '@/lib/session-token';
 
-export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; mustChangePassword: boolean };
+export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; avatar: string | null; mustChangePassword: boolean };
 export const sessionSettings = () => readSessionSettings(env);
 export const sessionCookieName = (secure: boolean) => secure ? '__Host-the-one.session' : 'the-one.session';
 export { hashToken, sessionLifetimeSeconds } from '@/lib/session-token';
@@ -26,7 +26,7 @@ export function sessionTokenFrom(requestHeaders: Headers, secure: boolean) {
   return /^[a-zA-Z0-9_-]{20,200}$/.test(token) ? token : null;
 }
 
-type SessionRow = { expires: Date | string; id: string; name: string | null; email: string; must_change_password: boolean };
+type SessionRow = { expires: Date | string; id: string; name: string | null; email: string; avatar: string | null; must_change_password: boolean };
 
 export async function getAppUser(req?: Request): Promise<AppUser | null> {
   const settings = sessionSettings();
@@ -35,7 +35,7 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
   if (!token) return null;
   const hashed = await hashToken(token);
   const row = (await database().query<SessionRow>(
-    `SELECT s.expires, u.id, u.name, u.email, u.must_change_password
+    `SELECT s.expires, u.id, u.name, u.email, u.avatar, u.must_change_password
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.session_token = $1`, [hashed],
   ))[0];
   if (!row) return null;
@@ -44,7 +44,7 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
     await database().query('DELETE FROM sessions WHERE session_token = $1', [hashed]);
     return null;
   }
-  return { userId: row.id, fullName: row.name ?? null, displayName: row.name || row.email, email: row.email, mustChangePassword: row.must_change_password };
+  return { userId: row.id, fullName: row.name ?? null, displayName: row.name || row.email, email: row.email, avatar: row.avatar ?? null, mustChangePassword: row.must_change_password };
 }
 
 export async function deleteSession(token: string) {

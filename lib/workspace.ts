@@ -8,6 +8,7 @@ export type WorkspaceMember = {
   role: WorkspaceRole;
   name: string | null;
   email: string | null;
+  avatar?: string | null;         // profile picture asset id
   clientId?: string | null;
   pending?: boolean | null;       // managers only: invited, never signed in yet
   lastLoginAt?: string | null;    // managers only

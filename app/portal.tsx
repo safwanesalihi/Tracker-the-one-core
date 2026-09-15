@@ -2,7 +2,7 @@
 // The client portal: four read-only screens, a request form and the review page.
 // Rendered for a signed-in client contact (mode "client") and for the studio's own preview (mode "preview").
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Home, Inbox, List, Loader2, LogOut, Send, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Home, Inbox, List, Loader2, Send, Settings2, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DatePicker from '@/app/date-picker';
@@ -17,14 +17,17 @@ import { Progress } from '@/components/ui/progress';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
 import { readStoredLocale } from '@/lib/i18n';
 import { useI18n } from '@/app/locale-provider';
-import LanguageSwitch from '@/app/language-switch';
+import SettingsDialog from '@/app/settings-dialog';
 
 export type PortalRoute = { page: string; id?: string; tab?: string };
 type Props = {
   mode: 'client' | 'preview';
   records: RecordItem[];
   client: RecordItem;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; avatar?: string | null };
+  workspaceId?: string | null;
+  /** Profile changes (name, picture) — resolves with the fresh user. */
+  onProfile?: (changes: { name?: string; avatar?: string | null }) => Promise<{ id: string; name: string; email: string; avatar?: string | null } | undefined>;
   route: PortalRoute;
   today: string;
   busy: boolean;
@@ -47,7 +50,7 @@ function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: LucideIc
   return <SidebarMenuItem><SidebarMenuButton isActive={active} className="nav-item" onClick={() => { onClick(); setOpenMobile(false); }}><Icon strokeWidth={1.5} /><span>{label}</span>{!!badge && <span className="counter">{badge}</span>}</SidebarMenuButton></SidebarMenuItem>;
 }
 
-export default function Portal({ mode, records, client, user, route, today, busy, error, notice, navigate, mutate, onNotice, onError, onLeave }: Props) {
+export default function Portal({ mode, records, client, user, workspaceId, route, today, busy, error, notice, navigate, mutate, onNotice, onError, onLeave, onProfile }: Props) {
   // The portal follows the app language (toggle in the sidebar). A client who never chose one starts in the
   // language recorded on their client file.
   const { locale, setLocale, t } = useI18n();
@@ -57,6 +60,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
   const [dialog, setDialog] = useState<'approve' | 'changes' | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [text, setText] = useState('');
   const [comment, setComment] = useState('');
@@ -283,9 +287,8 @@ export default function Portal({ mode, records, client, user, route, today, busy
           <NavItem icon={Inbox} label={copy.request} active={tab === 'request'} onClick={() => go('request')} />
         </SidebarMenu></SidebarGroup></SidebarContent>
         <SidebarFooter>
-          <LanguageSwitch />
           {mode === 'preview' && <button className="btn" onClick={onLeave}><ArrowLeft size={15} />{copy.backToStudio}</button>}
-          <div className="user-row"><Avatar name={user.name} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? t('Aperçu studio') : client.name}</small></div>{mode === 'client' && <button disabled={busy} onClick={onLeave} aria-label={copy.signOut}><LogOut size={15} /></button>}</div>
+          <div className="user-row"><button className="user-profile" onClick={() => setSettingsOpen(true)} aria-label={t('Paramètres')} title={t('Paramètres')}><Avatar name={user.name} avatar={user.avatar} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? t('Aperçu studio') : client.name}</small></div><Settings2 size={15} className="user-settings-icon" /></button></div>
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">
@@ -297,6 +300,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         </div>
       </main>
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} />{notice}</div>}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} user={user} workspaceId={workspaceId ?? null} onSave={async (changes) => onProfile ? onProfile(changes) : undefined} onLogout={() => { setSettingsOpen(false); onLeave(); }} />
       <Dialog open={!!dialog} onOpenChange={(o) => { if (!o && !busy) setDialog(null); }}>
         <DialogContent className="tracker-modal" dir={copy.dir}>
           <DialogHeader><DialogTitle>{dialog === 'approve' ? copy.approveTitle : copy.changesTitle}</DialogTitle><DialogDescription>{dialog === 'approve' ? copy.approveText(task?.name ?? '') : copy.changesText}</DialogDescription></DialogHeader>

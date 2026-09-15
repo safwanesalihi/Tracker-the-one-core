@@ -6,6 +6,7 @@ const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name'),
+  avatar: text('avatar'),                                  // asset id of the profile picture (see /api/assets)
   email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),          // scrypt
   mustChangePassword: boolean('must_change_password').notNull().default(false), // true while a temporary password is in force
