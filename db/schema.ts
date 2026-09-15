@@ -1,4 +1,6 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
 // Accounts are created by the studio (invitation with a temporary password) or seeded (the owner). No self sign-up.
 export const users = pgTable('users', {
@@ -52,3 +54,15 @@ export const records = pgTable('records', {
   data: jsonb('data').notNull(),
   revision: integer('revision').notNull().default(1),
 }, (t) => [index('idx_records_workspace_kind').on(t.workspaceId, t.kind)]);
+
+// Small images (client logos and banners), resized in the browser before upload.
+export const assets = pgTable('assets', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),                  // 'logo' | 'banner'
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  bytes: bytea('bytes').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('idx_assets_workspace').on(t.workspaceId)]);

@@ -37,6 +37,8 @@ export const fields = z.object({
   time: z.string().regex(/^$|^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   // The One Flow
   quota: z.string().regex(/^$|^\d{1,3}$/, 'Indiquez un nombre de contenus par mois.').optional(),
+  logo: z.string().regex(/^$|^[0-9a-f-]{36}$/).optional(),
+  banner: z.string().regex(/^$|^[0-9a-f-]{36}$/).optional(),
   evergreen: z.boolean().optional(),
 });
 

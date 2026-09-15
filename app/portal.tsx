@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft
 import { Sidebar, SidebarProvider, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Avatar from '@/app/profile-avatar';
+import ClientMark from '@/app/client-mark';
 import { type RecordItem, statuses, safeLink, channels, dayKey } from '@/lib/model';
 import { flow, hoursLeft, revisionState } from '@/lib/flow';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
@@ -142,6 +143,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
   function HomeScreen() {
     const first = user.name.includes('@') ? '' : user.name.split(' ')[0];
     return <>
+      {client.banner && <div className="portal-banner-image"><img src={`/api/assets/${client.banner}`} alt="" /></div>}
       <div className="page-heading"><div className="eyebrow">{copy.space.toUpperCase()}</div><h1>{copy.hello(first || client.contact || client.name)}</h1><p>{copy.tagline}</p></div>
       <div className={`portal-banner ${waiting.length ? 'active' : ''}`}><CheckCircle2 size={18} /><span>{waiting.length ? copy.waiting(waiting.length) : copy.nothingWaiting}</span>{!!waiting.length && <button className="btn primary" onClick={() => go('review')}>{copy.review}</button>}</div>
       <div className="portal-stats">{[[copy.inProduction, production.length], [copy.review, waiting.length], [copy.validatedThisMonth, validatedThisMonth.length]].map(([label, value]) => <div key={String(label)}><span>{label}</span><strong>{String(value).padStart(2, '0')}</strong></div>)}</div>
@@ -214,7 +216,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
   return <div dir={copy.dir} lang={rtl ? 'ar' : 'fr'} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
     <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
       <Sidebar className="tracker-sidebar" side={rtl ? 'right' : 'left'}>
-        <SidebarHeader><div className="brand"><img className="sidebar-logo logo-white" src="/the-one-core-logo-white.svg" alt="The One Core" /><div><strong>{client.name}</strong><small>{copy.portal}</small></div></div></SidebarHeader>
+        <SidebarHeader><div className="brand"><img className="sidebar-logo logo-white" src="/the-one-core-logo-white.svg" alt="The One Core" /><div className="brand-client"><ClientMark name={client.name} logo={client.logo} size="md" /><div><strong>{client.name}</strong><small>{copy.portal}</small></div></div></div></SidebarHeader>
         <SidebarContent><SidebarGroup><SidebarGroupLabel>{copy.space.toUpperCase()}</SidebarGroupLabel><SidebarMenu>
           <NavItem icon={Home} label={copy.home} active={tab === 'home'} onClick={() => go('home')} />
           <NavItem icon={CheckCircle2} label={copy.review} active={tab === 'review'} badge={waiting.length} onClick={() => go('review')} />

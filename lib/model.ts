@@ -44,6 +44,8 @@ export type RecordItem = {
   history?: { text: string; date: string }[];
   // The One Flow fields
   quota?: string;              // client: items sold per month
+  logo?: string;               // client: asset id (see /api/assets)
+  banner?: string;             // client: asset id
   approvalDueAt?: string;      // task: stored end of the 48h clock, never recomputed
   revisionRound?: number;      // task: client "request changes" rounds used
   signOff?: SignOff;           // task: validation receipt

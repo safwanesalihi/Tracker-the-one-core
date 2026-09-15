@@ -562,6 +562,9 @@ export async function POST(req: Request) {
         [JSON.stringify(item), existing.id, workspace.id, body.revision],
       );
       if (!changed.length) return response({ error: 'Modification simultanée. Actualisez votre espace.' }, 409);
+      // Replaced or removed images are dropped right away; ids are never reused.
+      const dropped = (['logo', 'banner'] as const).filter((k) => existing[k] && existing[k] !== item[k]).map((k) => existing[k]!);
+      if (dropped.length) await db.query('DELETE FROM assets WHERE workspace_id = $1 AND id = ANY($2::text[])', [workspace.id, dropped]);
     } else {
       await insert(item);
     }
