@@ -33,9 +33,7 @@ On-time publish rate (≥ 95 %), median client validation time (< 24 h, explicit
 
 Roles: **owner** (unique — the `OWNER_EMAIL` account), **admin** (optional delegated manager: everything but the owner role), **member** (`creative`: moves forward the tasks assigned to them or not yet assigned — enforced server-side by `memberView` — comments, manages clients and sub-projects, sees the team read-only; does not create tasks, has no Pilotage, cannot archive or act as the client in the portal preview), **viewer** (read-only, legacy), and **client**. `owner · admin · viewer` see the whole studio. A **`client`** member is scoped to one client (`workspace_members.client_id`) and only ever sees the portal: home, à valider, calendrier, livrables, demande and the review page with the countdown. Internal fields (assignee, source, reminders, studio links) are stripped server-side (`portalView`). Clients can approve, request changes, comment and submit requests — nothing else.
 
-**Closed studio**: with `OWNER_EMAIL` set (comma-separated addresses), only those addresses can open a workspace on their own. Any other Google sign-in without a pending invitation is refused before an account is created, and password sign-up requires an invitation code. Unset it for open sign-up (development).
-
-**Invitations**: Équipe → *Inviter une personne* (e-mail + role, plus the client for portal access). The row is stored as `invite:<email>` with an **invitation code** (shown to owners/admins). The invited person enters that code once, on the login page: with **Google** (code first, then *Continuer avec Google* — the code travels in a 10-minute HttpOnly cookie and is checked in the OAuth callback against the verified e-mail) or with **e-mail + password** at sign-up. Afterwards Google alone, or e-mail + password, is enough. The app sends no e-mail — share the URL and code yourself. In closed mode a member never gets, or sees, a personal workspace; the switcher only appears for someone genuinely invited to several studios.
+**Accounts and invitations**: there is no sign-up page. The owner (`OWNER_EMAIL`) signs in with `OWNER_PASSWORD` the first time and should change it in the app. Owners/admins invite people from Équipe → *Inviter une personne* (name, e-mail, role, and the client for portal access): the account is created immediately with a **temporary password**, e-mailed from the studio's Gmail (`GMAIL_USER` + `GMAIL_APP_PASSWORD`) — or shown once on the Team page when mail isn't configured. At first login the person must choose their own password; until then the app refuses every request (`password-change-required`). *Renvoyer / Réinitialiser* on a member issues a new temporary password and closes their sessions — that is the "forgot my password" path.
 
 The portal follows the client record’s `language`: `العربية` renders right-to-left with Arabic copy ([lib/portal-i18n.ts](lib/portal-i18n.ts)).
 
@@ -50,7 +48,7 @@ The portal follows the client record’s `language`: `العربية` renders ri
 ### Not done, on purpose
 
 - No e-mail/WhatsApp delivery of reminders or invitations — reminders are in-app events and the portal countdown; pick a provider (Resend, Brevo…) to add delivery on top of the existing events.
-- No e-mail verification or password reset yet (both need an e-mail provider). A locked or forgotten password is reset by the owner in the database until then.
+- Reminders are not e-mailed (only invitations are). The same Gmail sender could carry them; it is a small addition on top of the existing events.
 - Working-day calendars and holidays are not modelled: 48 h is 48 calendar hours, as the costs doc specifies.
 
 ## Stack
@@ -61,7 +59,7 @@ The portal follows the client record’s `language`: `العربية` renders ri
 | Database | **Supabase Postgres** through `postgres.js` — one small `Db` interface in [lib/database.ts](lib/database.ts) |
 | Local dev / tests | **PGlite** (embedded Postgres) in `.data/pglite` when `DATABASE_URL` is empty; tests run on a fresh in-memory PGlite |
 | Schema | Drizzle `pg-core` ([db/schema.ts](db/schema.ts)); migrations in `drizzle/`, applied with `pnpm db:migrate` |
-| Auth | Google (Auth.js) **or e-mail + password** ([lib/password-auth.ts](lib/password-auth.ts): scrypt hashes, 5-attempt lockout). Both issue the same hashed-token session cookie; Google tokens are never stored |
+| Auth | **E-mail + password only** ([lib/password-auth.ts](lib/password-auth.ts): scrypt hashes, 5-attempt lockout, hashed session tokens). No self sign-up: the owner is seeded from `OWNER_EMAIL`/`OWNER_PASSWORD`, everyone else is invited with a temporary password |
 
 `records.data` is `jsonb`; clients, projects, tasks, comments and events share that table with a `kind`.
 
@@ -69,12 +67,12 @@ The portal follows the client record’s `language`: `العربية` renders ri
 
 ```sh
 pnpm install
-cp .env.example .env      # fill AUTH_SECRET (32+ chars) and the Google client id/secret
+cp .env.example .env      # set OWNER_EMAIL / OWNER_PASSWORD
 pnpm dev                  # http://127.0.0.1:5173 — embedded Postgres, no Supabase needed
 pnpm test                 # 6 suites on in-memory Postgres
 ```
 
-The Google OAuth client must list `http://127.0.0.1:5173/api/auth/callback/google` as a redirect URI (see [GOOGLE-AUTH-SETUP.md](GOOGLE-AUTH-SETUP.md)). Delete `.data/` to start from an empty local database.
+Delete `.data/` to start from an empty local database.
 
 ## Supabase
 
@@ -95,11 +93,10 @@ Backups: Supabase Pro takes daily backups; `pg_dump "$DIRECT_URL" > backup.sql` 
 ## Vercel
 
 1. Import the repository; framework preset **Next.js**, build `pnpm build`.
-2. Environment variables (Production): `AUTH_URL=https://<your-domain>`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET` (32+ random chars), `OWNER_EMAIL` (the studio's address).
-3. Add `https://<your-domain>/api/auth/callback/google` to the Google OAuth client and publish the consent screen (only `openid email profile` are requested — no verification review needed).
-4. The cron in [vercel.json](vercel.json) is picked up on deploy.
+2. Environment variables (Production): `AUTH_URL=https://<your-domain>`, `OWNER_EMAIL`, `OWNER_PASSWORD`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET` (32+ random chars).
+3. The cron in [vercel.json](vercel.json) is picked up on deploy.
 
-Sign-in is refused on preview deployments by design: `AUTH_URL` must equal the exact origin the browser uses, and Auth.js is pinned to it.
+Sign-in is refused on preview deployments by design: `AUTH_URL` must equal the exact origin the browser uses.
 
 ## Team backend
 

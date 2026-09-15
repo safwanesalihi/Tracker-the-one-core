@@ -1,18 +1,19 @@
 import { getAppUser, type AppUser } from '@/lib/auth';
 import { requestOrigin } from '@/lib/auth-settings';
 import { batch, database, type Statement } from '@/lib/database';
+import { env } from '@/lib/env';
 import { fields, inviteFields, requestFields } from '@/lib/validation';
 import { RecordItem, sampleRecords } from '@/lib/model';
 import {
-  canManageMembers, inviteId, isStudioRole, isWorkspaceRole,
+  canManageMembers, isStudioRole, isWorkspaceRole, roleLabels,
   type WorkspaceContext, type WorkspaceMember, type WorkspaceSummary,
 } from '@/lib/workspace';
 import {
   approve, dayIn, flow, lockApplies, memberView, portalView, publish, requestChanges, sendForValidation,
 } from '@/lib/flow';
 import { applySweep, insertRecord, loadRecords } from '@/lib/flow-server';
-import { newInviteCode } from '@/lib/password-auth';
-import { closedStudio, isOwnerEmail } from '@/lib/access';
+import { isOwnerEmail, provisionAccount } from '@/lib/password-auth';
+import { mailConfigured, sendInvitation } from '@/lib/mail';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,28 +53,9 @@ async function ensureWorkspace(owner: string, name: string): Promise<WorkspaceCo
   return { id: workspace.id, name: workspace.name, role: workspace.role, clientId: workspace.clientId };
 }
 
-/** A pending invitation (row keyed by e-mail) becomes a membership the first time that verified Google e-mail signs in. */
-async function claimInvites(user: AppUser) {
-  if (!user.verified) return; // password accounts claim with the invitation code at sign-in
-  const pending = inviteId(user.email);
-  // Only invitations whose code was entered at Google sign-in (invite_code cleared) are claimed by e-mail.
-  const invites = await database().query<{ workspaceId: string }>(
-    'SELECT workspace_id AS "workspaceId" FROM workspace_members WHERE user_id = $1 AND invite_code IS NULL', [pending],
-  );
-  if (!invites.length) return;
-  const name = user.fullName || user.displayName;
-  await batch(database(), invites.flatMap(({ workspaceId }): Statement[] => [
-    { text: `UPDATE workspace_members SET user_id = $1, name = $2, email = $3, invite_code = NULL
-             WHERE workspace_id = $4 AND user_id = $5
-               AND NOT EXISTS (SELECT 1 FROM workspace_members WHERE workspace_id = $4 AND user_id = $1)`,
-      params: [user.userId, name, user.email, workspaceId, pending] },
-    { text: 'DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', params: [workspaceId, pending] },
-  ]));
-}
-
 const membershipOrder = 'ORDER BY CASE WHEN w.created_by = wm.user_id THEN 1 ELSE 0 END, wm.created_at ASC, w.id ASC';
-// In a closed studio, a member's own leftover workspace (from before the rule) is never offered.
-const hideOwnWorkspace = (user: AppUser) => closedStudio() && !isOwnerEmail(user.email);
+// Only the owner ever holds a workspace of their own; a leftover one on any other account is never offered.
+const hideOwnWorkspace = (user: AppUser) => !isOwnerEmail(user.email);
 const membershipFilter = 'AND ($2::boolean IS NOT TRUE OR w.created_by <> wm.user_id)';
 
 async function workspacesFor(user: AppUser): Promise<WorkspaceSummary[]> {
@@ -85,8 +67,7 @@ async function workspacesFor(user: AppUser): Promise<WorkspaceSummary[]> {
 }
 
 async function workspaceFor(user: AppUser, requestedId?: string | null): Promise<WorkspaceContext> {
-  await claimInvites(user);
-  // A member lands in the studio that invited them before their own empty workspace.
+  // A member lands in the studio that invited them; only the owner gets a workspace created for them.
   const membership = await one<MembershipRow>(
     `${membershipSelect} FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id
      WHERE wm.user_id = $1 AND ($3::text IS NULL OR w.id = $3) ${membershipFilter} ${membershipOrder} LIMIT 1`,
@@ -95,7 +76,7 @@ async function workspaceFor(user: AppUser, requestedId?: string | null): Promise
   if ((membership && !isWorkspaceRole(membership.role)) || (!membership && requestedId)) {
     throw new WorkspaceAccessError();
   }
-  if (!membership && closedStudio() && !isOwnerEmail(user.email)) throw new NoWorkspaceError();
+  if (!membership && !isOwnerEmail(user.email)) throw new NoWorkspaceError();
   const workspace: WorkspaceContext = membership
     ? { id: membership.id, name: membership.name, role: membership.role as WorkspaceContext['role'], clientId: membership.clientId }
     : await ensureWorkspace(user.userId, user.fullName || user.displayName);
@@ -108,11 +89,12 @@ async function workspaceFor(user: AppUser, requestedId?: string | null): Promise
   return workspace;
 }
 
-async function members(workspaceId: string, withCodes = false) {
+async function members(workspaceId: string, withState = false) {
   return database().query<WorkspaceMember>(
-    `SELECT user_id AS "userId", role, name, email, client_id AS "clientId", created_at AS "createdAt"${withCodes ? ', invite_code AS "inviteCode"' : ''}
-     FROM workspace_members WHERE workspace_id = $1
-     ORDER BY CASE WHEN role = 'owner' THEN 0 WHEN role = 'client' THEN 2 ELSE 1 END, created_at ASC, user_id ASC`,
+    `SELECT wm.user_id AS "userId", wm.role, wm.name, wm.email, wm.client_id AS "clientId", wm.created_at AS "createdAt"${withState
+      ? ', (u.must_change_password AND u.last_login_at IS NULL) AS "pending", u.last_login_at AS "lastLoginAt"' : ''}
+     FROM workspace_members wm LEFT JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = $1
+     ORDER BY CASE WHEN wm.role = 'owner' THEN 0 WHEN wm.role = 'client' THEN 2 ELSE 1 END, wm.created_at ASC, wm.user_id ASC`,
     [workspaceId],
   );
 }
@@ -146,12 +128,13 @@ async function payload(workspace: WorkspaceContext, user: AppUser, rows?: Record
   const roster = workspace.role === 'client' ? [] : await members(workspace.id, canManageMembers(workspace.role));
   return {
     records: visibleTo(workspace, rows, user),
-    user: { id: user.userId, name: user.fullName || user.displayName, email: user.email, image: user.image ?? null },
+    user: { id: user.userId, name: user.fullName || user.displayName, email: user.email },
     workspace,
-    // Members get the roster for display only: no e-mails, no pending invitations.
-    members: canManageMembers(workspace.role) ? roster : roster.filter((m) => !m.userId.startsWith('invite:')).map((m) => ({ ...m, email: m.userId === user.userId ? m.email : null })),
+    // Members get the roster for display only: no e-mails but their own.
+    members: canManageMembers(workspace.role) ? roster : roster.map((m) => ({ ...m, email: m.userId === user.userId ? m.email : null })),
     workspaces: await workspacesFor(user),
     today: dayIn(new Date()),
+    mailConfigured: mailConfigured(),
   };
 }
 
@@ -164,6 +147,7 @@ export async function GET(req?: Request) {
   try {
     const user = await identity(req);
     if (!user) return response({ error: 'Connectez-vous pour accéder à votre espace.' }, 401);
+    if (user.mustChangePassword) return response({ error: 'Choisissez votre mot de passe pour continuer.', code: 'password-change-required' }, 403);
     const workspace = await workspaceFor(user, req?.headers.get('X-Workspace-Id'));
     const rows = await all(workspace.id);
     if (!clientContextValid(workspace, rows)) {
@@ -182,6 +166,7 @@ export async function POST(req: Request) {
   try {
     const user = await identity(req);
     if (!user) return response({ error: 'Connexion requise.' }, 401);
+    if (user.mustChangePassword) return response({ error: 'Choisissez votre mot de passe pour continuer.', code: 'password-change-required' }, 403);
 
     const origin = req.headers.get('origin');
     if (origin && origin !== requestOrigin(req)) {
@@ -240,11 +225,19 @@ export async function POST(req: Request) {
 
     // ----- membership -----
 
+    const studioName = workspace.name;
+    const deliver = async (email: string, name: string, roleLabel: string, temporaryPassword: string, renewal: boolean) => {
+      const mail = await sendInvitation({ to: email, name, temporaryPassword, studio: studioName, url: env.AUTH_URL ?? new URL(req.url).origin, roleLabel, renewal });
+      // The temporary password is returned only when the studio has to pass it on by hand.
+      return { email, sent: mail.sent, error: mail.error, temporaryPassword: mail.sent ? undefined : temporaryPassword };
+    };
+
     if (body.action === 'invite-member') {
       if (!canManageMembers(workspace.role)) return response({ error: 'Seuls le propriétaire et les administrateurs peuvent inviter.' }, 403);
       const parsed = inviteFields.safeParse(body);
       if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
-      const { email, role } = parsed.data;
+      const { email, role, name } = parsed.data;
+      if (isOwnerEmail(email)) return response({ error: 'Cette adresse est celle du propriétaire.' }, 400);
       let clientId: string | null = null;
       if (role === 'client') {
         const client = rowsNow.find((r) => r.kind === 'client' && r.id === parsed.data.clientId && !r.archived);
@@ -252,15 +245,27 @@ export async function POST(req: Request) {
         clientId = client.id;
       }
       const duplicate = await one<{ userId: string }>(
-        'SELECT user_id AS "userId" FROM workspace_members WHERE workspace_id = $1 AND (user_id = $2 OR lower(email) = $3)',
-        [workspace.id, inviteId(email), email],
+        'SELECT user_id AS "userId" FROM workspace_members WHERE workspace_id = $1 AND lower(email) = $2', [workspace.id, email],
       );
-      if (duplicate) return response({ error: 'Cette adresse a déjà un accès ou une invitation en attente.' }, 409);
+      if (duplicate) return response({ error: 'Cette adresse est déjà membre de l’espace. Utilisez « Renvoyer l’invitation » pour un nouveau mot de passe temporaire.' }, 409);
+      const account = await provisionAccount(db, email, name ?? '');
       await db.query(
-        'INSERT INTO workspace_members (workspace_id, user_id, role, email, client_id, invite_code, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [workspace.id, inviteId(email), role, email, clientId, newInviteCode(), now],
+        `INSERT INTO workspace_members (workspace_id, user_id, role, name, email, client_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, client_id = EXCLUDED.client_id, name = COALESCE(EXCLUDED.name, workspace_members.name)`,
+        [workspace.id, account.userId, role, name || null, email, clientId, now],
       );
-      return response({ workspace, members: await members(workspace.id, true) });
+      const invitation = await deliver(email, name ?? '', roleLabels[role], account.temporaryPassword, false);
+      return response({ workspace, members: await members(workspace.id, true), invitation });
+    }
+
+    if (body.action === 'renew-invitation') {
+      if (!canManageMembers(workspace.role)) return response({ error: 'Seuls le propriétaire et les administrateurs peuvent renvoyer une invitation.' }, 403);
+      const target = await one<WorkspaceMember>('SELECT user_id AS "userId", role, name, email FROM workspace_members WHERE workspace_id = $1 AND user_id = $2', [workspace.id, body.userId]);
+      if (!target || !target.email) return response({ error: 'Membre introuvable.' }, 404);
+      if (target.role === 'owner' || target.userId === user.userId) return response({ error: 'Le propriétaire change son mot de passe depuis son compte.' }, 400);
+      const account = await provisionAccount(db, target.email.toLowerCase(), target.name ?? '');
+      const invitation = await deliver(target.email.toLowerCase(), target.name ?? '', roleLabels[target.role], account.temporaryPassword, true);
+      return response({ workspace, members: await members(workspace.id, true), invitation });
     }
 
     if (body.action === 'set-member-role' || body.action === 'remove-member') {

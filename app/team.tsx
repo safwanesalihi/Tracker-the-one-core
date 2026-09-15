@@ -1,14 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Copy, Lock, Mail, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import { Copy, KeyRound, Lock, Mail, MailCheck, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import Avatar from '@/app/profile-avatar';
-import { canManageMembers, invitableRoles, isInvite, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
+import { canManageMembers, invitableRoles, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type Invitation, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
 import type { RecordItem } from '@/lib/model';
 
 type Props = {
@@ -16,21 +16,23 @@ type Props = {
   members: WorkspaceMember[];
   clients?: RecordItem[];
   currentUserId: string;
-  currentUserImage?: string | null;
   busy: boolean;
-  onChange: (change: MemberChange) => Promise<void>;
+  mailConfigured?: boolean;
+  onChange: (change: MemberChange) => Promise<Invitation | void>;
   onRefresh: () => void;
 };
 
-export default function TeamPage({ workspace, members, clients = [], currentUserId, currentUserImage, busy, onChange, onRefresh }: Props) {
+export default function TeamPage({ workspace, members, clients = [], currentUserId, busy, mailConfigured = false, onChange, onRefresh }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [editing, setEditing] = useState<WorkspaceMember | null>(null);
   const [removing, setRemoving] = useState<WorkspaceMember | null>(null);
   const [role, setRole] = useState<EditableRole>('viewer');
   const [roleClient, setRoleClient] = useState('');
-  const [invite, setInvite] = useState({ email: '', role: 'creative' as EditableRole, clientId: '' });
+  const [invite, setInvite] = useState({ email: '', name: '', role: 'creative' as EditableRole, clientId: '' });
   const [inviteError, setInviteError] = useState('');
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [renewing, setRenewing] = useState<WorkspaceMember | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const opener = useRef<HTMLButtonElement | null>(null);
@@ -58,14 +60,28 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   async function sendInvite(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current) return;
-    inFlight.current = true; setSaving(true); setInviteError('');
+    inFlight.current = true; setSaving(true); setInviteError(''); setInvitation(null);
     try {
-      await onChange({ action: 'invite-member', email: invite.email, role: invite.role, ...(invite.role === 'client' ? { clientId: invite.clientId } : {}) });
-      setInvite({ email: '', role: 'creative', clientId: '' });
+      const result = await onChange({ action: 'invite-member', email: invite.email, name: invite.name, role: invite.role, ...(invite.role === 'client' ? { clientId: invite.clientId } : {}) });
+      if (result) setInvitation(result);
+      setInvite({ email: '', name: '', role: 'creative', clientId: '' });
     } catch (error) {
       setInviteError(error instanceof Error ? error.message : 'Invitation impossible. Réessayez.');
     } finally { inFlight.current = false; setSaving(false); }
   }
+  async function renew() {
+    if (!renewing || inFlight.current) return;
+    inFlight.current = true; setSaving(true); setSaveError(''); setInvitation(null);
+    try {
+      const result = await onChange({ action: 'renew-invitation', userId: renewing.userId });
+      if (result) setInvitation(result);
+      setRenewing(null);
+      document.getElementById('team-invite-title')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Envoi impossible. Réessayez.');
+    } finally { inFlight.current = false; setSaving(false); }
+  }
+  const when = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
   const clientName = (id?: string | null) => clients.find((c) => c.id === id)?.name || 'Client à préciser';
   const activeClients = clients.filter((c) => !c.archived);
 
@@ -89,19 +105,30 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <a className="btn primary" href="/login" target="_top">Se connecter</a>
     </Empty> : <>
       <div className="team-summary">
-        {([['MEMBRES', members.filter((m) => !isInvite(m.userId)).length], ['GESTION DES ACCÈS', managers], ['LECTURE SEULE', viewers], ['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length], ['INVITATIONS', members.filter((m) => isInvite(m.userId)).length]] as const).map(([label, value]) =>
+        {([['MEMBRES', members.length], ['GESTION DES ACCÈS', managers], ['LECTURE SEULE', viewers], ['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length], ['EN ATTENTE', members.filter((m) => m.pending).length]] as const).map(([label, value]) =>
           <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </div>
       {allowed && <section className="team-card team-invite" aria-labelledby="team-invite-title">
-        <div className="section-head"><div><h2 id="team-invite-title">Inviter une personne</h2><p>Avec Google, l’invitation s’active à la première connexion avec cette adresse. Avec un mot de passe, la personne saisit le code d’invitation affiché ci-dessous. Aucun e-mail n’est envoyé par l’application : transmettez-lui le lien et le code vous-même.</p></div></div>
+        <div className="section-head"><div><h2 id="team-invite-title">Inviter une personne</h2><p>{mailConfigured
+          ? 'Un e-mail avec un mot de passe temporaire part depuis la boîte Gmail du studio. La personne se connecte et choisit son mot de passe.'
+          : 'L’envoi d’e-mail n’est pas configuré : le mot de passe temporaire s’affiche ici, transmettez-le vous-même. La personne se connecte et choisit son mot de passe.'}</p></div></div>
         <form className="team-invite-form" onSubmit={sendInvite}>
-          <label className="form-field"><span>Adresse e-mail Google</span><input type="email" required maxLength={200} value={invite.email} disabled={disabled} onChange={(event) => setInvite({ ...invite, email: event.target.value })} placeholder="prenom@entreprise.com" /></label>
+          <label className="form-field"><span>Nom</span><input required maxLength={120} value={invite.name} disabled={disabled} onChange={(event) => setInvite({ ...invite, name: event.target.value })} placeholder="Prénom Nom" /></label>
+          <label className="form-field"><span>Adresse e-mail</span><input type="email" required maxLength={200} value={invite.email} disabled={disabled} onChange={(event) => setInvite({ ...invite, email: event.target.value })} placeholder="prenom@entreprise.com" /></label>
           <label className="form-field"><span>Rôle</span><Select value={invite.role} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, role: value as EditableRole })}><SelectTrigger className="pick" aria-label="Rôle de l’invité"><SelectValue /></SelectTrigger><SelectContent>{invitableRoles.map((value) => <SelectItem key={value} value={value}>{roleLabels[value]}</SelectItem>)}</SelectContent></Select></label>
           {invite.role === 'client' && <label className="form-field"><span>Client</span><Select value={invite.clientId || '__none'} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, clientId: value === '__none' ? '' : value })}><SelectTrigger className="pick" aria-label="Client de l’invité"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">Choisir un client</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
-          <button className="btn primary" disabled={disabled || (invite.role === 'client' && !invite.clientId)}><UserPlus size={15} />{saving ? 'Enregistrement…' : 'Inviter'}</button>
+          <button className="btn primary" disabled={disabled || (invite.role === 'client' && !invite.clientId)}><UserPlus size={15} />{saving ? 'Envoi…' : mailConfigured ? 'Envoyer l’invitation' : 'Créer l’accès'}</button>
         </form>
         <p className="team-role-description">{roleDescriptions[invite.role]}</p>
         {inviteError && <p className="form-error" role="alert">{inviteError}</p>}
+        {invitation && <div className={`team-invitation ${invitation.sent ? 'sent' : ''}`} role="status">
+          {invitation.sent
+            ? <><MailCheck size={18} /><div><strong>Invitation envoyée à {invitation.email}</strong><p>Le mot de passe temporaire est dans l’e-mail. À sa première connexion, la personne choisira son mot de passe.</p></div></>
+            : <><KeyRound size={18} /><div><strong>Accès créé pour {invitation.email}</strong>{invitation.error && <p className="form-error">{invitation.error}</p>}<p>Transmettez ces informations à la personne (elle changera le mot de passe à sa première connexion) :</p>
+              <dl><div><dt>Adresse</dt><dd>{typeof window === 'undefined' ? '' : window.location.origin}</dd></div><div><dt>Identifiant</dt><dd>{invitation.email}</dd></div><div><dt>Mot de passe temporaire</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label="Copier le mot de passe temporaire" onClick={() => { void navigator.clipboard?.writeText(invitation.temporaryPassword ?? ''); }}><Copy size={13} /></button></dd></div></dl>
+              <p>Il n’est affiché qu’une fois. Pour en générer un autre : « Renvoyer » sur la ligne du membre.</p></div></>}
+          <button type="button" className="icon-button" aria-label="Fermer" onClick={() => setInvitation(null)}>×</button>
+        </div>}
       </section>}
       <section className="team-card" aria-labelledby="team-members-title">
         <div className="section-head team-toolbar">
@@ -121,15 +148,15 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
             const own = member.userId === currentUserId;
             const editable = allowed && member.role !== 'owner' && !own;
             return <TableRow key={member.userId}>
-              <TableCell><div className="team-person"><Avatar name={name} image={own ? currentUserImage : null} /><div className="member-identity">
-                <strong>{name} {own && <span className="neutral-badge">Vous</span>}{isInvite(member.userId) && <span className="neutral-badge"><Mail size={10} /> Invitation en attente</span>}</strong>
-                <small>{member.role === 'client' ? `Portail · ${clientName(member.clientId)}` : member.email || 'Profil disponible après sa première connexion'}</small>
-                {isInvite(member.userId) && member.inviteCode && <small className="team-invite-code">Code d’invitation : <code>{member.inviteCode}</code><button type="button" className="icon-button" aria-label={`Copier le code ${member.inviteCode}`} onClick={() => { void navigator.clipboard?.writeText(member.inviteCode!); }}><Copy size={13} /></button></small>}
+              <TableCell><div className="team-person"><Avatar name={name} /><div className="member-identity">
+                <strong>{name} {own && <span className="neutral-badge">Vous</span>}{member.pending && <span className="neutral-badge"><Mail size={10} /> En attente de première connexion</span>}</strong>
+                <small>{member.role === 'client' ? `Portail · ${clientName(member.clientId)}` : member.email || 'Membre'}{allowed && member.lastLoginAt ? ` · dernière connexion ${when(member.lastLoginAt)}` : ''}</small>
               </div></div></TableCell>
               <TableCell><span className="team-role-label">{roleLabels[member.role]}</span></TableCell>
               <TableCell className="team-date"><time dateTime={member.createdAt}>{new Date(member.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</time></TableCell>
               <TableCell><div className="team-member-actions">{editable ? <>
                 <button className="btn" disabled={disabled} aria-label={`Modifier le rôle de ${name}`} onClick={(event) => { opener.current = event.currentTarget; setRole(member.role as EditableRole); setRoleClient(member.clientId || ''); setSaveError(''); setEditing(member); }}>Modifier</button>
+                <button className="btn" disabled={disabled} aria-label={`Renvoyer l’invitation à ${name}`} title="Nouveau mot de passe temporaire" onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRenewing(member); }}><Mail size={14} />{member.pending ? 'Renvoyer' : 'Réinitialiser'}</button>
                 <button className="icon-button team-remove" disabled={disabled} aria-label={`Retirer ${name} de l’espace`} onClick={(event) => { opener.current = event.currentTarget; setSaveError(''); setRemoving(member); }}><Trash2 size={16} /></button>
               </> : <span className="team-access-note"><Lock size={13} />{member.role === 'owner' ? 'Protégé' : own ? 'Votre accès' : 'Consultation'}</span>}</div></TableCell>
             </TableRow>;
@@ -140,7 +167,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         <section><h2>Qui peut faire quoi ?</h2><p>Les accès sont vérifiés à chaque action.</p>
           <div className="team-permissions">{workspaceRoles.filter((value) => value !== 'viewer' || members.some((m) => m.role === 'viewer')).map((value) => <div key={value}><ShieldCheck size={16} /><div><strong>{roleLabels[value]}</strong><p>{roleDescriptions[value]}</p></div></div>)}</div>
         </section>
-        <section className="team-tip"><span className="onboarding-icon"><Lock size={20} /></span><h3>Un accès à tout l’espace</h3><p>Les membres du studio voient tout l’espace. Un accès « Client » ne voit que le portail de son client : livrables, validation, retours, demandes et calendrier.</p><p>L’application n’envoie aucun e-mail : partagez l’adresse du portail à la personne invitée. Elle se connecte avec Google, ou crée un mot de passe et saisit son code d’invitation.</p></section>
+        <section className="team-tip"><span className="onboarding-icon"><Lock size={20} /></span><h3>Un accès à tout l’espace</h3><p>Un « Membre » travaille sur les tâches qui lui sont assignées. Un accès « Client » ne voit que le portail de son client : livrables, validation, retours, demandes et calendrier.</p><p>Chaque accès est créé ici avec un mot de passe temporaire ; la personne le remplace à sa première connexion. Mot de passe oublié ? « Réinitialiser » lui en envoie un nouveau.</p></section>
       </div>
     </>}
     <Dialog open={!!editing} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }}>
@@ -155,6 +182,13 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         </form>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={!!renewing} onOpenChange={(open) => { if (!open && !saving) setRenewing(null); }}>
+      <AlertDialogContent className="team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.focus(); }}>
+        <AlertDialogHeader><AlertDialogTitle>{renewing?.pending ? 'Renvoyer l’invitation ?' : 'Réinitialiser le mot de passe ?'}</AlertDialogTitle><AlertDialogDescription>{renewing && memberName(renewing)} recevra un nouveau mot de passe temporaire{mailConfigured ? ' par e-mail' : ' (affiché ici, à transmettre)'}. L’ancien mot de passe et ses sessions en cours cessent de fonctionner immédiatement.</AlertDialogDescription></AlertDialogHeader>
+        {saveError && <p className="form-error" role="alert">{saveError}</p>}
+        <AlertDialogFooter><AlertDialogCancel disabled={saving}>Annuler</AlertDialogCancel><AlertDialogAction disabled={disabled || !allowed} onClick={(event) => { event.preventDefault(); void renew(); }}>{saving ? 'Envoi…' : 'Confirmer'}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <AlertDialog open={!!removing} onOpenChange={(open) => { if (!open && !saving) setRemoving(null); }}>
       <AlertDialogContent className="team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.isConnected ? opener.current.focus() : document.getElementById('team-members-title')?.focus(); }}>
         <AlertDialogHeader><AlertDialogTitle>Retirer l’accès à cet espace ?</AlertDialogTitle><AlertDialogDescription>{removing && memberName(removing)} ne pourra plus accéder aux clients, projets et tâches de cet espace. Ses contributions seront conservées. Rétablir cet accès nécessitera une nouvelle invitation ; ce parcours n’est pas encore disponible.</AlertDialogDescription></AlertDialogHeader>

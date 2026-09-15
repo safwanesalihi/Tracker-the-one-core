@@ -1,5 +1,6 @@
-import { authSettings, sessionSettings } from '@/lib/auth';
+import { sessionSettings } from '@/lib/auth';
+import { mailConfigured } from '@/lib/mail';
 export const dynamic = 'force-dynamic';
 export function GET() {
-  return Response.json({ googleConfigured: !!authSettings(), passwordConfigured: !!sessionSettings() }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ passwordConfigured: !!sessionSettings(), mailConfigured: mailConfigured() }, { headers: { 'Cache-Control': 'no-store' } });
 }

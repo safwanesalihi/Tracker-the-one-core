@@ -11,10 +11,10 @@ await esbuild.build({ entryPoints: ['app/api/records/route.ts'], outfile: '.site
 const { db, pg } = await createTestDb();
 globalThis.testDb = db;
 globalThis.testEnv = { OWNER_EMAIL: 'owner@studio.test' };
-const owner = { userId: 'owner', fullName: 'Safwane Owner', displayName: 'Safwane Owner', email: 'owner@studio.test', verified: true };
-const yasmine = { userId: 'u-yasmine', fullName: 'Yasmine Creative', displayName: 'Yasmine Creative', email: 'yasmine@studio.test', verified: true };
-const amine = { userId: 'u-amine', fullName: 'Amine Creative', displayName: 'Amine Creative', email: 'amine@studio.test', verified: true };
-const contact = { userId: 'u-contact', fullName: 'Client Contact', displayName: 'Client Contact', email: 'contact@client.test', verified: true };
+const owner = { userId: 'owner', fullName: 'Safwane Owner', displayName: 'Safwane Owner', email: 'owner@studio.test' };
+const yasmine = { userId: '', fullName: 'Yasmine Creative', displayName: 'Yasmine Creative', email: 'yasmine@studio.test' };
+const amine = { userId: '', fullName: 'Amine Creative', displayName: 'Amine Creative', email: 'amine@studio.test' };
+const contact = { userId: '', fullName: 'Client Contact', displayName: 'Client Contact', email: 'contact@client.test' };
 const { GET, POST } = await import(pathToFileURL(process.cwd() + '/.sites-runtime/roles-test.mjs'));
 
 let checks = 0;
@@ -39,12 +39,12 @@ const c1 = await post({ action: 'create', kind: 'client', data: { name: 'Client 
 const c2 = await post({ action: 'create', kind: 'client', data: { name: 'Client Deux' } });
 const p1 = await post({ action: 'create', kind: 'project', data: { name: 'Projet Un', clientId: c1.id } });
 const p2 = await post({ action: 'create', kind: 'project', data: { name: 'Projet Deux', clientId: c2.id } });
-await post({ action: 'invite-member', email: 'yasmine@studio.test', role: 'creative' });
-await post({ action: 'invite-member', email: 'amine@studio.test', role: 'creative' });
-await post({ action: 'invite-member', email: 'contact@client.test', role: 'client', clientId: c1.id });
+const idOf = (d, email) => d.members.find((m) => m.email === email).userId;
+yasmine.userId = idOf(await post({ action: 'invite-member', email: 'yasmine@studio.test', name: 'Yasmine Creative', role: 'creative' }), 'yasmine@studio.test');
+amine.userId = idOf(await post({ action: 'invite-member', email: 'amine@studio.test', name: 'Amine Creative', role: 'creative' }), 'amine@studio.test');
+contact.userId = idOf(await post({ action: 'invite-member', email: 'contact@client.test', name: 'Client Contact', role: 'client', clientId: c1.id }), 'contact@client.test');
 await post({ action: 'invite-member', email: 'x@y.test', role: 'owner' }, 400);
-await pg.query("UPDATE workspace_members SET invite_code = NULL WHERE user_id LIKE 'invite:%'"); // codes entered at Google sign-in (covered in tests/auth.mjs)
-as(yasmine); await get(200, null); as(amine); await get(200, null); as(contact); await get(200, null); // claim invitations
+await post({ action: 'invite-member', email: 'owner@studio.test', role: 'creative' }, 400);
 as(owner);
 const t = (name, clientId, projectId, assignee, extra = {}) => post({ action: 'create', kind: 'task', data: { name, clientId, projectId, assignee, status: 'En cours', due: '2026-12-01', ...extra } });
 const ty1 = await t('Reel Yasmine', c1.id, p1.id, 'Yasmine Creative', { deliverable: 'https://x.test/y1.mp4' });

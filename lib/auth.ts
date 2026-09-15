@@ -1,137 +1,52 @@
-import { Auth, type AuthConfig } from '@auth/core';
-import Google from '@auth/core/providers/google';
+// Sessions: a random token in an HttpOnly cookie, stored hashed. Nothing else identifies a user.
 import { headers } from 'next/headers';
 import { env } from '@/lib/env';
 import { database } from '@/lib/database';
-import { postgresAuthAdapter } from '@/lib/auth-adapter';
-import { readAuthSettings, readSessionSettings, requestOrigin, safeCallbackUrl } from '@/lib/auth-settings';
-import { googleProfileImage } from '@/lib/profile';
-import { googleAdmission } from '@/lib/access';
+import { readSessionSettings } from '@/lib/auth-settings';
+import { hashToken } from '@/lib/session-token';
 
-export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; image: string | null; verified: boolean };
-export const authSettings = () => readAuthSettings(env);
+export type AppUser = { userId: string; displayName: string; fullName: string | null; email: string; mustChangePassword: boolean };
 export const sessionSettings = () => readSessionSettings(env);
 export const sessionCookieName = (secure: boolean) => secure ? '__Host-the-one.session' : 'the-one.session';
-export const inviteCookieName = (secure: boolean) => secure ? '__Host-the-one.invite' : 'the-one.invite';
-export const clearInviteCookie = (secure: boolean) => `${inviteCookieName(secure)}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
-const sessionLifetime = 60 * 60 * 24 * 7;
+export { hashToken, sessionLifetimeSeconds } from '@/lib/session-token';
 
-// Hashed session tokens and no provider tokens: see lib/auth-adapter.ts.
-export function authAdapter() {
-  return postgresAuthAdapter(database());
+export function sessionCookie(secure: boolean, token: string, expires: Date) {
+  return `${sessionCookieName(secure)}=${token}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires.toUTCString()}${secure ? '; Secure' : ''}`;
+}
+export function clearSessionCookie(secure: boolean) {
+  return `${sessionCookieName(secure)}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
 }
 
-export function authConfig(settings: NonNullable<ReturnType<typeof authSettings>>, inviteCode: string | null = null): AuthConfig {
-  return {
-    basePath: '/api/auth',
-    secret: settings.secret,
-    // Allowed only after handleAuth's exact configured-origin check.
-    trustHost: true,
-    useSecureCookies: settings.secure,
-    adapter: authAdapter(),
-    session: { strategy: 'database', maxAge: sessionLifetime, updateAge: sessionLifetime,
-      generateSessionToken: () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
-    },
-    cookies: { sessionToken: { name: sessionCookieName(settings.secure), options: {
-      httpOnly: true, secure: settings.secure, sameSite: 'lax', path: '/',
-    } } },
-    providers: [Google({
-      clientId: settings.clientId, clientSecret: settings.clientSecret,
-      checks: ['pkce', 'state', 'nonce'],
-      authorization: { params: { scope: 'openid email profile', prompt: 'select_account' } },
-      allowDangerousEmailAccountLinking: false,
-      // Google Workspace accounts often omit `picture` from the ID token; the userinfo endpoint always
-      // returns the current photo. The ID token is still validated (nonce, audience, expiry).
-      // Provider-level option, merged at runtime; not part of the user-config type.
-      ...({ idToken: false } as Record<string, unknown>),
-    })],
-    pages: { signIn: '/login', error: '/login' },
-    callbacks: {
-      async signIn({ account, profile }) {
-        if (account?.provider !== 'google' || profile?.email_verified !== true || typeof profile.email !== 'string') return false;
-        // Refresh the photo only for this verified, already-linked Google identity.
-        const adapter = authAdapter();
-        const existing = await adapter.getUserByAccount!({ provider: 'google', providerAccountId: account.providerAccountId });
-        if (existing) await adapter.updateUser!({ id: existing.id, image: googleProfileImage(profile.picture) });
-        // Closed studio: the owner comes in freely; everyone else joins with the invitation code entered on the login page.
-        const decision = await googleAdmission(database(), profile.email, !!existing, inviteCode);
-        if (decision === 'ok') return true;
-        return decision === 'AccessDenied' ? false : `${settings.origin}/login?error=${decision}`;
-      },
-      redirect({ url }) { return safeCallbackUrl(url, settings.origin); },
-      session({ session, user }) {
-        // Never expose the database session token or provider tokens to browser JS.
-        return { expires: session.expires, user: { id: user.id, name: user.name, email: user.email, image: user.image } };
-      },
-    },
-    logger: {
-      // Avoid logging callback codes, tokens, cookies, or provider response bodies.
-      error(error) { console.error('Authentication failed', error.name); },
-      warn(code) { console.warn('Authentication warning', code); },
-      debug() {},
-    },
-  };
-}
-
-export async function handleAuth(req: Request) {
-  const settings = authSettings();
-  if (!settings) return Response.json({ error: 'La connexion Google n’est pas encore configurée.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-  const url = new URL(req.url);
-  const origin = req.headers.get('origin');
-  if (requestOrigin(req) !== settings.origin || (req.method !== 'GET' && origin !== settings.origin)) {
-    return Response.json({ error: 'Origine non autorisée.' }, { status: 403 });
-  }
-  try {
-    const inviteCookie = (req.headers.get('cookie') ?? '').split(';').map((p) => p.trim()).find((p) => p.startsWith(inviteCookieName(settings.secure) + '='));
-    const inviteCode = inviteCookie ? decodeURIComponent(inviteCookie.slice(inviteCookieName(settings.secure).length + 1)).slice(0, 20) : null;
-    const config = authConfig(settings, inviteCode);
-    let failed = false;
-    const logError = config.logger!.error!;
-    config.logger!.error = (error) => { failed = true; logError(error); };
-    // Auth.js derives redirect and callback URLs from the request URL: pin it to the configured origin.
-    const pinned = new Request(settings.origin + url.pathname + url.search, {
-      method: req.method, headers: req.headers,
-      body: req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.arrayBuffer(),
-    });
-    const result = await Auth(pinned, config);
-    const response = new Response(result.body, { status: result.status, statusText: result.statusText, headers: new Headers(result.headers) });
-    // Auth.js clears the browser cookie even if deletion fails. Keep it available
-    // for a retry instead of reporting a successful revocation that did not occur.
-    if (failed && url.pathname === '/api/auth/signout') {
-      return Response.json({ error: 'Déconnexion impossible. Réessayez.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-    }
-    response.headers.set('Cache-Control', 'no-store');
-    response.headers.set('Referrer-Policy', 'no-referrer');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    // The invitation code is single-use: drop it once Google has answered.
-    if (inviteCode && url.pathname.startsWith('/api/auth/callback/')) response.headers.append('Set-Cookie', clearInviteCookie(settings.secure));
-    return response;
-  } catch {
-    console.error('Authentication request unavailable');
-    return Response.json({ error: 'Connexion indisponible. Réessayez.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-  }
-}
-
-export async function getAppUser(req?: Request): Promise<AppUser | null> {
-  // Password sessions must work even when Google is not configured.
-  const settings = sessionSettings();
-  if (!settings) return null;
-  const requestHeaders = req?.headers ?? await headers();
-  // No fallback to ChatGPT headers, a development cookie, or a browser-supplied user ID.
-  const name = sessionCookieName(settings.secure);
+/** The raw session token from the request, if the cookie is well-formed and unique. */
+export function sessionTokenFrom(requestHeaders: Headers, secure: boolean) {
+  const name = sessionCookieName(secure);
   const cookies = (requestHeaders.get('cookie') ?? '').split(';').map((part) => part.trim()).filter((part) => part.startsWith(name + '='));
   if (cookies.length !== 1) return null;
   const token = cookies[0].slice(name.length + 1);
-  if (!/^[a-zA-Z0-9_-]{20,200}$/.test(token)) return null;
-  const adapter = authAdapter();
-  const result = await adapter.getSessionAndUser!(token);
-  if (!result || !result.user.email) return null;
-  if (!Number.isFinite(result.session.expires.valueOf()) || result.session.expires.valueOf() <= Date.now()) {
-    await adapter.deleteSession!(token);
+  return /^[a-zA-Z0-9_-]{20,200}$/.test(token) ? token : null;
+}
+
+type SessionRow = { expires: Date | string; id: string; name: string | null; email: string; must_change_password: boolean };
+
+export async function getAppUser(req?: Request): Promise<AppUser | null> {
+  const settings = sessionSettings();
+  if (!settings) return null;
+  const token = sessionTokenFrom(req?.headers ?? await headers(), settings.secure);
+  if (!token) return null;
+  const hashed = await hashToken(token);
+  const row = (await database().query<SessionRow>(
+    `SELECT s.expires, u.id, u.name, u.email, u.must_change_password
+     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.session_token = $1`, [hashed],
+  ))[0];
+  if (!row) return null;
+  const expires = new Date(row.expires).valueOf();
+  if (!Number.isFinite(expires) || expires <= Date.now()) {
+    await database().query('DELETE FROM sessions WHERE session_token = $1', [hashed]);
     return null;
   }
-  return { userId: result.user.id, fullName: result.user.name ?? null,
-    displayName: result.user.name || result.user.email, email: result.user.email, image: googleProfileImage(result.user.image),
-    // Only a verified e-mail (Google) may claim invitations by address; password accounts use an invitation code.
-    verified: !!result.user.emailVerified };
+  return { userId: row.id, fullName: row.name ?? null, displayName: row.name || row.email, email: row.email, mustChangePassword: row.must_change_password };
+}
+
+export async function deleteSession(token: string) {
+  await database().query('DELETE FROM sessions WHERE session_token = $1', [await hashToken(token)]);
 }

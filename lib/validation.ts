@@ -50,6 +50,7 @@ export const requestFields = z.object({
 
 export const inviteFields = z.object({
   email: z.string().trim().toLowerCase().email('Adresse e-mail invalide.').max(200),
-  role: z.enum(['admin', 'creative', 'viewer', 'client']),
+  name: z.string().trim().max(120).optional(),
+  role: z.enum(['admin', 'creative', 'client']),
   clientId: z.string().max(100).optional(),
 });

@@ -10,9 +10,10 @@ mkdirSync('.sites-runtime', { recursive: true });
 await esbuild.build({ entryPoints: ['app/api/records/route.ts'], outfile: '.sites-runtime/flow-api-test.mjs', bundle: true, platform: 'node', format: 'esm', plugins: [testRuntimePlugin({ auth: false })] });
 const { db, pg } = await createTestDb();
 globalThis.testDb = db;
-const owner = { userId: 'owner-a', fullName: 'Test Owner', displayName: 'Test Owner', email: 'owner@studio.test', verified: true };
-const contact = { userId: 'google-contact-1', fullName: 'Amina Contact', displayName: 'Amina Contact', email: 'Amina@Client.test', verified: true };
-const creative = { userId: 'creative-1', fullName: 'Yasmine', displayName: 'Yasmine', email: 'yasmine@studio.test', verified: true };
+const owner = { userId: 'owner-a', fullName: 'Test Owner', displayName: 'Test Owner', email: 'owner@studio.test' };
+const contact = { userId: '', fullName: 'Amina Contact', displayName: 'Amina Contact', email: 'amina@client.test' }; // id assigned by the invitation
+const creative = { userId: '', fullName: 'Yasmine', displayName: 'Yasmine', email: 'yasmine@studio.test' };
+globalThis.testEnv = { OWNER_EMAIL: 'owner@studio.test' };
 globalThis.testUser = owner;
 const { GET, POST } = await import(pathToFileURL(process.cwd() + '/.sites-runtime/flow-api-test.mjs'));
 
@@ -54,15 +55,18 @@ const sent = await post({ action: 'update', kind: 'task', id: t.id, revision: 2,
 const sentTask = find(sent, t.id);
 ok(sentTask.sentAt && sentTask.approvalDueAt && new Date(sentTask.approvalDueAt) - new Date(sentTask.sentAt) === 48 * 3600 * 1000, '48 h clock stored');
 
-// Invite a client contact; the invite is claimed at the contact's first sign-in, case-insensitively.
+// Invite a client contact: the account exists at once with a temporary password (shown to the studio since no mail is configured).
 await post({ action: 'invite-member', email: 'amina@client.test', role: 'client' }, 400);
 await post({ action: 'invite-member', email: 'amina@client.test', role: 'client', clientId: 'nope' }, 400);
-const invited = await post({ action: 'invite-member', email: 'amina@client.test', role: 'client', clientId: c.id });
-ok(invited.members.some((m) => m.userId === 'invite:amina@client.test' && m.role === 'client' && m.clientId === c.id), 'pending invite row');
-await post({ action: 'invite-member', email: 'AMINA@client.test', role: 'viewer' }, 409);
-await post({ action: 'invite-member', email: 'yasmine@studio.test', role: 'creative' });
+const invited = await post({ action: 'invite-member', email: 'Amina@Client.test', name: 'Amina Contact', role: 'client', clientId: c.id });
+const aminaRow = invited.members.find((m) => m.email === 'amina@client.test');
+ok(aminaRow && aminaRow.role === 'client' && aminaRow.clientId === c.id && aminaRow.pending === true, 'member row created, pending first login');
+ok(invited.invitation && invited.invitation.sent === false && /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(invited.invitation.temporaryPassword), 'temporary password returned when mail is not configured');
+contact.userId = aminaRow.userId;
+await post({ action: 'invite-member', email: 'AMINA@client.test', role: 'creative' }, 409);
+const invitedCrew = await post({ action: 'invite-member', email: 'yasmine@studio.test', name: 'Yasmine', role: 'creative' });
+creative.userId = invitedCrew.members.find((m) => m.email === 'yasmine@studio.test').userId;
 
-await pg.query("UPDATE workspace_members SET invite_code = NULL WHERE user_id LIKE 'invite:%'"); // codes entered at Google sign-in (covered in tests/auth.mjs)
 globalThis.testUser = contact;
 const portal = await get(200, null);
 eq([portal.workspace.id, portal.workspace.role, portal.workspace.clientId], [WS, 'client', c.id], 'the contact lands in the studio workspace as a client');
@@ -75,7 +79,7 @@ ok(visible && visible.status === 'À valider' && visible.approvalDueAt, 'the del
 await post({ action: 'create', kind: 'task', data: base }, 403);
 await post({ action: 'update', kind: 'task', id: t.id, revision: 3, data: base }, 403);
 await post({ action: 'publish', taskId: t.id }, 403);
-await post({ action: 'invite-member', email: 'x@y.test', role: 'viewer' }, 403);
+await post({ action: 'invite-member', email: 'x@y.test', role: 'creative' }, 403);
 await post({ action: 'demo' }, 403);
 await post({ action: 'mark-read', ids: [] }, 403);
 // …but can request changes (a counted round) and comment.
@@ -88,7 +92,7 @@ await post({ action: 'approve', taskId: t.id }, 409);
 // A request through the form creates a task the studio must triage.
 const req = await post({ action: 'request', data: { name: 'Story Aïd', due: day(30), channel: 'Instagram', description: 'Visuel + texte' } });
 const requested = find(req, req.id);
-eq([requested.status, requested.clientId, requested.projectId, requested.request.email, 'source' in requested], ['À faire', c.id, p.id, 'Amina@Client.test', false], 'request created; internal source hidden from the client');
+eq([requested.status, requested.clientId, requested.projectId, requested.request.email, 'source' in requested], ['À faire', c.id, p.id, 'amina@client.test', false], 'request created; internal source hidden from the client');
 await post({ action: 'request', data: { name: '', due: day(30) } }, 400);
 await post({ action: 'request', data: { name: 'x', projectId: 'other' } }, 400);
 
@@ -97,13 +101,12 @@ globalThis.testUser = owner;
 const owned = await get();
 ok(owned.records.some((r) => r.kind === 'event' && r.type === 'request' && r.taskId === req.id), 'the studio sees the request event');
 eq(find(owned, req.id).source, 'Portail', 'source recorded for the studio');
-ok(owned.members.find((m) => m.userId === contact.userId && m.role === 'client' && m.clientId === c.id && m.email === contact.email), 'invite became a membership');
-ok(!owned.members.some((m) => m.userId === 'invite:amina@client.test'), 'the pending row is gone');
+ok(owned.members.find((m) => m.userId === contact.userId && m.role === 'client' && m.clientId === c.id && m.email === contact.email), 'the contact is a member');
 const resent = await post({ action: 'update', kind: 'task', id: t.id, revision: find(owned, t.id).revision, data: { ...base, status: 'À valider' } });
 globalThis.testUser = contact;
 const approved = await post({ action: 'approve', taskId: t.id });
 const signed = find(approved, t.id);
-eq([signed.status, signed.signOff.mode, signed.signOff.by, signed.signOff.email, signed.signOff.round], ['Validé', 'explicit', 'Amina Contact', 'Amina@Client.test', 1]);
+eq([signed.status, signed.signOff.mode, signed.signOff.by, signed.signOff.email, signed.signOff.round], ['Validé', 'explicit', 'Amina Contact', 'amina@client.test', 1]);
 await post({ action: 'approve', taskId: t.id }, 409);
 
 // Publish (studio only, validated only), then evergreen rules.
@@ -146,15 +149,15 @@ const crew = await get(200, null);
 eq([crew.workspace.id, crew.workspace.role], [WS, 'creative']);
 await post({ action: 'create', kind: 'task', data: { ...base, name: 'Rush', due: day(2) } }, 403);
 await post({ action: 'create', kind: 'task', data: { ...base, name: 'Rush', due: day(2) }, lockOverride: true }, 403);
-await post({ action: 'invite-member', email: 'z@z.test', role: 'viewer' }, 403);
+await post({ action: 'invite-member', email: 'z@z.test', role: 'creative' }, 403);
 
-// Removing the client's access ends the portal; the contact's own workspace stays empty.
+// Removing the client's access ends the portal; nobody but the owner ever gets a workspace of their own.
 globalThis.testUser = owner;
 await post({ action: 'set-member-role', userId: contact.userId, expectedRole: 'client', role: 'client', clientId: 'missing' }, 400);
 await post({ action: 'remove-member', userId: contact.userId, expectedRole: 'client' });
 globalThis.testUser = contact;
 await get(403, WS);
-const fallback = await get(200, null);
-ok(fallback.workspace.id !== WS && fallback.records.length === 0, 'no leakage after revocation');
+const fallback = await get(403, null);
+eq(fallback.code, 'no-workspace', 'no workspace is created for a revoked account');
 
 console.log(`${checks} flow API checks passed: J−7 lock, 48 h clock, invitations, client portal scope, rounds, receipts, publish, evergreen, sweep idempotence and revocation.`);

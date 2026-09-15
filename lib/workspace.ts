@@ -9,13 +9,16 @@ export type WorkspaceMember = {
   name: string | null;
   email: string | null;
   clientId?: string | null;
-  inviteCode?: string | null;   // only sent to owners/admins, only for pending invitations
+  pending?: boolean | null;       // managers only: invited, never signed in yet
+  lastLoginAt?: string | null;    // managers only
   createdAt: string;
 };
+export type Invitation = { email: string; sent: boolean; error?: string; temporaryPassword?: string };
 export type MemberChange =
   | { action: 'set-member-role'; userId: string; expectedRole: WorkspaceRole; role: EditableRole; clientId?: string }
   | { action: 'remove-member'; userId: string; expectedRole: WorkspaceRole }
-  | { action: 'invite-member'; email: string; role: EditableRole; clientId?: string };
+  | { action: 'invite-member'; email: string; name?: string; role: EditableRole; clientId?: string }
+  | { action: 'renew-invitation'; userId: string };
 
 export const roleLabels: Record<WorkspaceRole, string> = {
   owner: 'Propriétaire',
@@ -38,6 +41,4 @@ export const isWorkspaceRole = (value: unknown): value is WorkspaceRole =>
   typeof value === 'string' && workspaceRoles.some((role) => role === value);
 export const canManageMembers = (role: WorkspaceRole) => role === 'owner' || role === 'admin';
 export const isStudioRole = (role: WorkspaceRole) => role !== 'client';
-export const isInvite = (userId: string) => userId.startsWith('invite:');
-export const inviteId = (email: string) => `invite:${email.trim().toLowerCase()}`;
 export const memberName = (member: WorkspaceMember) => member.name || member.email || 'Membre sans profil';

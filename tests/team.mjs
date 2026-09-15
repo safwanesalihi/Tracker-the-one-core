@@ -24,10 +24,11 @@ const members = [
 ];
 const base = { members, currentUserId: 'a', workspace: { id: 'workspace-test', name: 'Studio test', role: 'owner' } };
 const owner = render(base);
-const withPhoto = render({ ...base, currentUserImage: 'https://lh3.googleusercontent.com/test-avatar' });
-assert.match(withPhoto, /alt="Photo de profil de Ava"/);
-assert.doesNotMatch(withPhoto, /alt="Photo de profil de Nina"/);
-assert.doesNotMatch(render({ ...base, currentUserImage: 'javascript:alert(1)' }), /src="javascript:/);
+const withPending = render({ ...base, members: members.map((m) => m.userId === 'c' ? { ...m, pending: true } : m) });
+assert.match(withPending, /En attente de première connexion/);
+assert.match(withPending, /Renvoyer l’invitation à Jules/);
+assert.match(withPending, /Inviter une personne/);
+assert.doesNotMatch(render({ ...base, members: members.map((m) => ({ ...m, name: '<img src=x onerror=alert(1)>' })) }), /<img src=x/);
 assert.match(owner, /Modifier le rôle de Nina/);
 assert.match(owner, /Retirer Jules de l’espace/);
 assert.doesNotMatch(owner, /Modifier le rôle de Ava|Retirer Ava de l’espace/);

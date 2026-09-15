@@ -15,7 +15,7 @@ type Props = {
   mode: 'client' | 'preview';
   records: RecordItem[];
   client: RecordItem;
-  user: { id: string; name: string; email: string; image?: string | null };
+  user: { id: string; name: string; email: string };
   route: PortalRoute;
   today: string;
   busy: boolean;
@@ -202,7 +202,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
           <section className="comments"><h2>{copy.comments}</h2>
             {comments.map((c) => <div className="comment" key={c.id}><Avatar name={c.author} /><div><strong>{c.author}</strong><small>{fmt(c.createdAt, true)}</small><p>{c.name}</p></div></div>)}
             {!comments.length && <p className="small-note">{copy.conversationStart}</p>}
-            <form className="comment-composer" onSubmit={sendComment}><Avatar name={user.name} image={user.image} /><textarea maxLength={5000} rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.writeComment} aria-label={copy.writeComment} /><button className="btn" disabled={busy || !comment.trim()} aria-label={copy.send}><Send size={16} /></button></form>
+            <form className="comment-composer" onSubmit={sendComment}><Avatar name={user.name} /><textarea maxLength={5000} rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.writeComment} aria-label={copy.writeComment} /><button className="btn" disabled={busy || !comment.trim()} aria-label={copy.send}><Send size={16} /></button></form>
           </section>
         </aside>
       </div>
@@ -224,7 +224,7 @@ export default function Portal({ mode, records, client, user, route, today, busy
         </SidebarMenu></SidebarGroup></SidebarContent>
         <SidebarFooter>
           {mode === 'preview' && <button className="btn" onClick={onLeave}><ArrowLeft size={15} />{copy.backToStudio}</button>}
-          <div className="user-row"><Avatar name={user.name} image={user.image} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? 'Aperçu studio' : client.name}</small></div>{mode === 'client' && <button disabled={busy} onClick={onLeave} aria-label={copy.signOut}><LogOut size={15} /></button>}</div>
+          <div className="user-row"><Avatar name={user.name} /><div><strong>{user.name.includes('@') ? user.name.split('@')[0] : user.name}</strong><small>{mode === 'preview' ? 'Aperçu studio' : client.name}</small></div>{mode === 'client' && <button disabled={busy} onClick={onLeave} aria-label={copy.signOut}><LogOut size={15} /></button>}</div>
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">

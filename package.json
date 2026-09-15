@@ -12,11 +12,10 @@
     "lint": "eslint . --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "node tests/records.mjs && node tests/team.mjs && node tests/auth.mjs && node tests/password.mjs && node tests/roles.mjs && node tests/task-draft.mjs && node tests/flow.mjs && node tests/flow-api.mjs",
+    "test": "node tests/records.mjs && node tests/team.mjs && node tests/signin.mjs && node tests/roles.mjs && node tests/task-draft.mjs && node tests/flow.mjs && node tests/flow-api.mjs",
     "auth:check": "node scripts/check-google-config.mjs"
   },
   "dependencies": {
-    "@auth/core": "0.41.3",
     "@base-ui/react": "^1.7.0",
     "@electric-sql/pglite": "0.5.8",
     "@hookform/resolvers": "^5.7.1",
@@ -31,6 +30,7 @@
     "lucide-react": "^1.31.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
+    "nodemailer": "^6.10.1",
     "postgres": "3.4.9",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
@@ -47,6 +47,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "drizzle-kit": "0.31.10",

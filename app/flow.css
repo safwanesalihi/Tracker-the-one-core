@@ -169,3 +169,19 @@
 .btn.primary:hover{background:#efb541;border-color:#bf8719;color:#1b160b}
 .section-head .btn.primary{font-size:12.5px;min-height:38px;padding:8px 15px;letter-spacing:0}
 .section-head .btn.primary svg{width:15px;height:15px}
+
+.team-invitation{display:flex;gap:12px;align-items:flex-start;margin:0 22px 22px;padding:14px 16px;border:1px solid #E5A93C;background:#FFF8EA;border-radius:8px;position:relative}
+.team-invitation.sent{border-color:#cfe3d6;background:#eef7f1}
+.team-invitation>svg{flex-shrink:0;margin-top:2px}
+.team-invitation>div{flex:1;min-width:0}
+.team-invitation strong{font-size:13px}
+.team-invitation p{font-size:12px;color:#556276;line-height:1.7;margin-top:4px}
+.team-invitation dl{margin:10px 0;display:flex;flex-direction:column;gap:6px}
+.team-invitation dl>div{display:grid;grid-template-columns:150px 1fr;gap:8px;font-size:12px;align-items:center}
+.team-invitation dt{color:#697587}
+.team-invitation dd{margin:0;display:flex;align-items:center;gap:6px;overflow-wrap:anywhere}
+.team-invitation code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;letter-spacing:.06em;background:#fff;border:1px solid #e5e8ee;border-radius:4px;padding:2px 8px}
+.team-invitation>.icon-button{position:absolute;top:8px;right:8px;width:26px;height:26px;font-size:16px}
+.team-invite-form{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) auto}
+@media (max-width:1100px){.team-invite-form{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){.team-invite-form{grid-template-columns:1fr}.team-invitation dl>div{grid-template-columns:1fr}}

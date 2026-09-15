@@ -7,6 +7,7 @@ const esbuild=await import(pathToFileURL(esbuildPath));
 mkdirSync('.sites-runtime',{recursive:true});
 await esbuild.build({entryPoints:['app/api/records/route.ts'],outfile:'.sites-runtime/route-test.mjs',bundle:true,platform:'node',format:'esm',plugins:[testRuntimePlugin({auth:false})]});
 const {db,pg}=await createTestDb();globalThis.testDb=db;
+globalThis.testEnv={OWNER_EMAIL:'test@example.com'};
 globalThis.testUser={userId:'owner-a',fullName:'Test Owner',displayName:'Test Owner',email:'test@example.com'};
 const {GET,POST}=await import(pathToFileURL(process.cwd()+'/.sites-runtime/route-test.mjs'));
 let assertions=0;

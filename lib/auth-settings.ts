@@ -1,37 +1,16 @@
-export type AuthEnvironment = {
-  AUTH_URL?: string;
-  AUTH_SECRET?: string;
-  AUTH_GOOGLE_ID?: string;
-  AUTH_GOOGLE_SECRET?: string;
-};
+export type AuthEnvironment = { AUTH_URL?: string };
 
-/** Origin and session secret: enough for password sign-in and for reading sessions. */
+/** The configured origin: sessions are only issued to, and accepted from, requests on this exact origin. */
 export function readSessionSettings(env: AuthEnvironment) {
-  const { AUTH_URL, AUTH_SECRET } = env;
-  if (!AUTH_URL || !AUTH_SECRET || AUTH_SECRET.length < 32) return null;
+  const { AUTH_URL } = env;
+  if (!AUTH_URL) return null;
   try {
     const url = new URL(AUTH_URL);
     if (url.username || url.password || url.search || url.hash || url.pathname !== '/') return null;
     const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
     if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) return null;
-    if (url.hostname.endsWith('.chatgpt.site')) return null;
-    return { origin: url.origin, secret: AUTH_SECRET, secure: url.protocol === 'https:' };
+    return { origin: url.origin, secure: url.protocol === 'https:' };
   } catch { return null; }
-}
-
-/** Session settings plus the Google client: what Auth.js needs. */
-export function readAuthSettings(env: AuthEnvironment) {
-  const base = readSessionSettings(env);
-  const { AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET } = env;
-  if (!base || !AUTH_GOOGLE_ID?.endsWith('.apps.googleusercontent.com') || !AUTH_GOOGLE_SECRET) return null;
-  return { ...base, clientId: AUTH_GOOGLE_ID, clientSecret: AUTH_GOOGLE_SECRET };
-}
-
-export function safeCallbackUrl(value: string, origin: string) {
-  try {
-    const url = new URL(value, origin);
-    return url.origin === origin && !url.username && !url.password ? url.href : origin + '/';
-  } catch { return origin + '/'; }
 }
 
 /**
