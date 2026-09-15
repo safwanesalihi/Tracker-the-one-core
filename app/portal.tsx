@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import Avatar from '@/app/profile-avatar';
 import ClientMark from '@/app/client-mark';
 import { type RecordItem, statuses, safeLink, channels, dayKey } from '@/lib/model';
-import { flow, hoursLeft, revisionState } from '@/lib/flow';
+import { flow, hoursLeft, revisionState, shiftDay } from '@/lib/flow';
+import { Progress } from '@/components/ui/progress';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
 
 export type PortalRoute = { page: string; id?: string; tab?: string };
@@ -145,18 +146,46 @@ export default function Portal({ mode, records, client, user, route, today, busy
   }
 
   function HomeScreen() {
-    const first = user.name.includes('@') ? '' : user.name.split(' ')[0];
+    // Greet the person, not the studio: the signed-in contact, or the client's named contact in the studio preview.
+    const who = mode === 'client' ? (user.name.includes('@') ? '' : user.name.split(' ')[0]) : (client.contact && client.contact !== 'Contact à renseigner' ? client.contact.split(' ')[0] : '');
+    const month = today.slice(0, 7);
+    const publishedThisMonth = tasks.filter((t) => t.publishedAt && t.publishedAt.slice(0, 7) === month);
+    const quota = client.quota && /^\d+$/.test(client.quota) ? Number(client.quota) : null;
+    const weekEnd = shiftDay(today, 6);
+    const thisWeek = tasks.filter((t) => t.due && t.due >= today && t.due <= weekEnd && !t.publishedAt).sort((a, b) => a.due!.localeCompare(b.due!));
+    const mix = statuses.map((status) => ({ status, count: tasks.filter((t) => t.status === status).length }));
     return <>
-      {client.banner && <div className="portal-banner-image"><img src={`/api/assets/${client.banner}`} alt="" /></div>}
-      <div className="page-heading"><div className="eyebrow">{copy.space.toUpperCase()}</div><h1>{copy.hello(first || client.contact || client.name)}</h1><p>{copy.tagline}</p></div>
+      <div className="page-heading"><div className="eyebrow">{copy.dashboard.toUpperCase()}</div><h1>{copy.hello(who || client.name)}</h1><p>{copy.tagline}</p></div>
       <div className={`portal-banner ${waiting.length ? 'active' : ''}`}><CheckCircle2 size={18} /><span>{waiting.length ? copy.waiting(waiting.length) : copy.nothingWaiting}</span>{!!waiting.length && <button className="btn primary" onClick={() => go('review')}>{copy.review}</button>}</div>
-      <div className="portal-stats">{[[copy.inProduction, production.length], [copy.review, waiting.length], [copy.validatedThisMonth, validatedThisMonth.length]].map(([label, value]) => <div key={String(label)}><span>{label}</span><strong>{String(value).padStart(2, '0')}</strong></div>)}</div>
-      <section className="portal-section"><div className="section-head"><h2>{copy.upcoming}</h2><button className="text-link" onClick={() => go('calendar')}>{copy.calendar}<ArrowUpRight size={14} /></button></div>
-        {upcoming.length ? <div className="task-rows">{upcoming.slice(0, 6).map((t) => <button className="task-line" key={t.id} onClick={() => navigate({ page: 'review', id: t.id })}><span className="task-line-icon"><CalendarDays size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{pname(t.projectId)}</small></span><Chip status={t.status} copy={copy} /><span className="due">{fmt(t.due)}</span>{rtl ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>)}</div> : <p className="small-note">{copy.noUpcoming}</p>}
-      </section>
-      <section className="portal-section"><div className="section-head"><h2>{copy.activity}</h2></div>
-        <div className="portal-activity">{events.slice(0, 6).map((e) => <div key={e.id}><span className={`portal-dot ${e.type}`} /><p>{e.name}<small>{fmt(e.createdAt, true)}</small></p></div>)}{!events.length && <p className="small-note">{copy.conversationStart}</p>}</div>
-      </section>
+      <div className="portal-stats portal-stats-4">{[[copy.inProduction, production.length], [copy.review, waiting.length], [copy.validatedThisMonth, validatedThisMonth.length], [copy.publishedThisMonth, publishedThisMonth.length]].map(([label, value]) => <div key={String(label)}><span>{label}</span><strong>{String(value).padStart(2, '0')}</strong></div>)}</div>
+
+      <div className="portal-dashboard">
+        <div className="portal-col">
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.review}<span className="neutral-badge">{waiting.length}</span></h2></div>{!!waiting.length && <button className="text-link" onClick={() => go('review')}>{copy.seeAll}<ArrowUpRight size={14} /></button>}</div>
+            {waiting.length ? <div className="task-rows">{waiting.slice(0, 4).map((t) => <button className="task-line" key={t.id} onClick={() => navigate({ page: 'review', id: t.id })}><span className="task-line-icon"><FileText size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{pname(t.projectId)}{t.approvalDueAt ? ` · ${copy.clock(Math.max(0, hoursLeft(t, now) ?? 0))}` : ''}</small></span><Chip status={t.status} copy={copy} />{rtl ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>)}</div> : <p className="small-note">{copy.nothingWaitingText}</p>}
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.thisWeek}<span className="neutral-badge">{thisWeek.length}</span></h2></div><button className="text-link" onClick={() => go('calendar')}>{copy.calendar}<ArrowUpRight size={14} /></button></div>
+            {thisWeek.length ? <div className="task-rows">{thisWeek.map((t) => <button className="task-line" key={t.id} onClick={() => navigate({ page: 'review', id: t.id })}><span className="task-line-icon"><CalendarDays size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{pname(t.projectId)}{t.channel ? ` · ${t.channel}` : ''}</small></span><Chip status={t.status} copy={copy} /><span className="due">{fmt(t.due)}</span></button>)}</div> : <p className="small-note">{copy.nothingThisWeek}</p>}
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.upcoming}</h2></div><button className="text-link" onClick={() => go('tasks')}>{copy.tasks}<ArrowUpRight size={14} /></button></div>
+            {upcoming.length ? <div className="task-rows">{upcoming.slice(0, 6).map((t) => <button className="task-line" key={t.id} onClick={() => navigate({ page: 'review', id: t.id })}><span className="task-line-icon"><CalendarDays size={16} /></span><span className="task-line-name"><strong>{t.name}</strong><small>{pname(t.projectId)}</small></span><Chip status={t.status} copy={copy} /><span className="due">{fmt(t.due)}</span></button>)}</div> : <p className="small-note">{copy.noUpcoming}</p>}
+          </section>
+        </div>
+        <div className="portal-col">
+          <section className="portal-card portal-quota"><div className="section-head"><div><h2>{copy.quotaTitle}</h2><p>{new Date(today + 'T12:00:00').toLocaleDateString(copy.locale, { month: 'long', year: 'numeric' })}</p></div></div>
+            {quota ? <><strong className="portal-quota-number">{publishedThisMonth.length}<small> / {quota}</small></strong><Progress value={Math.min(100, publishedThisMonth.length / quota * 100)} /><p className="small-note">{copy.quotaText(publishedThisMonth.length, quota)} · {copy.quotaLeft(quota - publishedThisMonth.length)}</p></> : <p className="small-note">{copy.noQuota}</p>}
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.statusMix}</h2></div></div>
+            <div className="portal-mix">{mix.map(({ status, count }) => <div key={status}><Chip status={status} copy={copy} /><div className="portal-mix-bar"><span style={{ width: `${tasks.length ? count / tasks.length * 100 : 0}%` }} className={`s${statuses.indexOf(status)}`} /></div><strong>{count}</strong></div>)}</div>
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.progressTitle}</h2></div></div>
+            {projects.length ? <div className="portal-progress">{projects.map((p) => { const ts = tasks.filter((t) => t.projectId === p.id), done = ts.filter((t) => t.status === 'Validé').length; return <div key={p.id}><div className="portal-progress-head"><strong>{p.name}</strong><small>{copy.validatedOf(done, ts.length)}</small></div><Progress value={ts.length ? done / ts.length * 100 : 0} /></div>; })}</div> : <p className="small-note">{copy.noTasks}</p>}
+          </section>
+          <section className="portal-card"><div className="section-head"><div><h2>{copy.activity}</h2></div></div>
+            <div className="portal-activity">{events.slice(0, 6).map((e) => <div key={e.id}><span className={`portal-dot ${e.type}`} /><p>{e.name}<small>{fmt(e.createdAt, true)}</small></p></div>)}{!events.length && <p className="small-note">{copy.conversationStart}</p>}</div>
+          </section>
+        </div>
+      </div>
     </>;
   }
 
