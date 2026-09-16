@@ -264,9 +264,11 @@ export function portalView(records: RecordItem[], clientId: string): RecordItem[
   const taskIds = new Set(tasks.map((t) => t.id));
   const comments = records.filter((r) => r.kind === 'comment' && !!r.taskId && taskIds.has(r.taskId));
   const events = records.filter((r) => r.kind === 'event' && r.audience !== 'studio' && !!r.taskId && taskIds.has(r.taskId));
+  // Devis/factures/contrats addressed to this client — never anyone else's.
+  const documents = records.filter((r) => r.kind === 'document' && r.clientId === clientId);
   const { drive, contract, ...visibleClient } = client;
   void drive; void contract;
-  return [visibleClient, ...projects, ...tasks, ...comments, ...events];
+  return [visibleClient, ...projects, ...tasks, ...comments, ...events, ...documents];
 }
 
 // ---------- what a creative (member) may see ----------
@@ -281,5 +283,8 @@ export function memberView(records: RecordItem[], identities: string[], userId?:
   const taskIds = new Set(tasks.map((t) => t.id));
   const comments = records.filter((r) => r.kind === 'comment' && !!r.taskId && taskIds.has(r.taskId));
   const events = records.filter((r) => r.kind === 'event' && !!r.taskId && taskIds.has(r.taskId));
-  return [...clients, ...projects, ...tasks, ...comments, ...events];
+  // Shared team resources — visible to every studio role, this one included. Devis/factures/
+  // contrats ('document') are deliberately never added here: a member never sees them exist.
+  const library = records.filter((r) => r.kind === 'library');
+  return [...clients, ...projects, ...tasks, ...comments, ...events, ...library];
 }

@@ -1,4 +1,5 @@
 import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
@@ -54,7 +55,12 @@ export const records = pgTable('records', {
   kind: text('kind').notNull(),
   data: jsonb('data').notNull(),
   revision: integer('revision').notNull().default(1),
-}, (t) => [index('idx_records_workspace_kind').on(t.workspaceId, t.kind)]);
+}, (t) => [
+  index('idx_records_workspace_kind').on(t.workspaceId, t.kind),
+  // Devis/facture/contrat numbers (e.g. FACTURE-2026-0001) are unique per workspace and type —
+  // the real guarantee behind the app-level retry-on-conflict when a number is assigned.
+  uniqueIndex('idx_records_document_number').on(t.workspaceId, sql`(data->>'docType')`, sql`(data->>'number')`).where(sql`kind = 'document'`),
+]);
 
 // Small images (client logos and banners), resized in the browser before upload.
 export const assets = pgTable('assets', {

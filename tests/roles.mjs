@@ -108,6 +108,46 @@ const a = await get();
 eq(ids(a, 'task'), [ta1.id, tu.id].sort(), 'Amine’s task and the unassigned one; ty2 stayed with Yasmine since the hand-off was rejected');
 eq(a.records.filter((r) => r.kind === 'comment').length, 2, 'comments on Amine’s task and on the unassigned task are visible to Amine; Yasmine’s own-task comment is not');
 
+// A member manages the shared library freely, but devis/factures/contrats stay invisible to them.
+as(amine);
+const lib1 = await post({ action: 'create', kind: 'library', data: { name: 'Prompt accroche Instagram', category: 'prompt', content: 'Écris une accroche…' } });
+ok(lib1.records.some((r) => r.id === lib1.id && r.kind === 'library'), 'a member can add a library item and sees it right away');
+const libUpdated = await post({ action: 'update', kind: 'library', id: lib1.id, revision: 1, data: { name: 'Prompt accroche Instagram v2', category: 'prompt', content: 'Écris une accroche punchy…' } });
+eq(libUpdated.records.find((r) => r.id === lib1.id).name, 'Prompt accroche Instagram v2', 'a member can edit any library item, not just their own');
+await post({ action: 'delete', kind: 'library', id: lib1.id, revision: 2 });
+ok(!(await get()).records.some((r) => r.id === lib1.id), 'the deleted library item is gone for everyone');
+const lib2 = await post({ action: 'create', kind: 'library', data: { name: 'Logo pack', category: 'asset', link: 'https://drive.example.test/logo-pack' } });
+ok(lib2.records.some((r) => r.id === lib2.id && r.category === 'asset' && r.link), 'a link-based library item (asset/plugin/preset) needs no file upload');
+
+as(owner);
+const devis1 = await post({ action: 'create', kind: 'document', data: { docType: 'devis', clientId: c1.id, lineItems: [{ description: 'Pack contenu', quantity: 1, unitPrice: 5000 }], taxRate: 20 } });
+const devisNumber = devis1.records.find((r) => r.id === devis1.id).number;
+ok(/^DEVIS-\d{4}-0001$/.test(devisNumber), 'the first devis of the year is numbered 0001');
+const devis2 = await post({ action: 'create', kind: 'document', data: { docType: 'devis', clientId: c2.id, lineItems: [] } });
+ok(devis2.records.find((r) => r.id === devis2.id).number.endsWith('-0002'), 'the second devis this year gets the next number, regardless of client');
+const facture1 = await post({ action: 'create', kind: 'document', data: { docType: 'facture', clientId: c1.id, lineItems: [] } });
+ok(facture1.records.find((r) => r.id === facture1.id).number.endsWith('-0001'), 'factures have their own sequence, independent of devis');
+
+// Sending a devis locks its line items — but re-saving it unchanged (e.g. archiving it) must still work:
+// line items are stored as jsonb, which does not preserve key order, so a naive JSON.stringify
+// comparison would wrongly see a round-tripped-but-identical array as "changed".
+const devisSent = await post({ action: 'update', kind: 'document', id: devis1.id, revision: 1, data: {
+  docType: 'devis', clientId: c1.id, docStatus: 'sent', lineItems: devis1.records.find((r) => r.id === devis1.id).lineItems, taxRate: 20,
+} });
+eq(devisSent.records.find((r) => r.id === devis1.id).docStatus, 'sent', 'the devis is now sent');
+await post({ action: 'update', kind: 'document', id: devis1.id, revision: 2, data: {
+  docType: 'devis', clientId: c1.id, docStatus: 'sent', lineItems: [{ description: 'Autre chose', quantity: 1, unitPrice: 1 }], taxRate: 20,
+} }, 409); // a real change to the line items is still rejected once sent
+const archived = await post({ action: 'update', kind: 'document', id: devis1.id, revision: 2, data: {
+  docType: 'devis', clientId: c1.id, docStatus: 'sent', lineItems: devisSent.records.find((r) => r.id === devis1.id).lineItems, taxRate: 20, archived: true,
+} });
+ok(archived.records.find((r) => r.id === devis1.id).archived, 'archiving a sent devis with its lines unchanged succeeds');
+await post({ action: 'delete', kind: 'document', id: devis1.id, revision: 3 }, 409); // sent (even archived) documents are never hard-deleted
+
+as(amine);
+ok(!(await get()).records.some((r) => r.kind === 'document'), 'a member never sees that a devis/facture/contrat exists');
+await post({ action: 'create', kind: 'document', data: { docType: 'devis', clientId: c1.id, lineItems: [] } }, 403);
+
 // The client sees their portal only: their client, projects and tasks — nobody else’s.
 as(contact);
 const c = await get();
@@ -118,6 +158,7 @@ eq(ids(c, 'task'), [ty1.id, ta1.id, tu.id, mine.id].sort(), 'all of Client Un’
 ok(!c.records.some((r) => r.id === newClient.id), 'other clients invisible');
 ok(c.records.filter((r) => r.kind === 'task').every((r) => !('assignee' in r)), 'assignees hidden from the client');
 eq(c.members, []);
+eq(ids(c, 'document'), [devis1.id, facture1.id].sort(), 'Client Un sees their own devis and facture, not Client Deux’s devis');
 await post({ action: 'approve', taskId: ty1.id });
 await post({ action: 'update', kind: 'task', id: ta1.id, revision: 1, data: { name: 'x', clientId: c1.id, projectId: p1.id } }, 403);
 
@@ -133,6 +174,14 @@ for (const role of ['admin', 'viewer', 'client']) {
   if (role === 'admin') {
     const renamed = await post({ action: 'update', kind: 'client', id: newClient.id, revision: 1, data: { name: 'Client renommé par un admin' } });
     eq(renamed.records.find((r) => r.id === newClient.id).name, 'Client renommé par un admin', 'an admin can edit an existing client’s page');
+    ok(!(await get()).records.some((r) => r.kind === 'document'), 'an admin never sees that a devis/facture/contrat exists either');
+    await post({ action: 'create', kind: 'document', data: { docType: 'devis', clientId: c1.id, lineItems: [] } }, 403);
+  }
+  if (role === 'viewer') {
+    const viewerView = await get();
+    ok(viewerView.records.some((r) => r.kind === 'library'), 'a viewer still reads the library');
+    ok(!viewerView.records.some((r) => r.kind === 'document'), 'a viewer never sees devis/factures/contrats either');
+    await post({ action: 'create', kind: 'library', data: { name: 'x', category: 'prompt', content: 'y' } }, 403);
   }
 }
 as(owner);

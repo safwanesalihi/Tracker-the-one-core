@@ -2,7 +2,7 @@
 // The client portal: four read-only screens, a request form and the review page.
 // Rendered for a signed-in client contact (mode "client") and for the studio's own preview (mode "preview").
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Home, Inbox, List, Loader2, Send, Settings2, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Download, Eye, FileSignature, FileText, Home, Inbox, List, Loader2, Send, Settings2, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DatePicker from '@/app/date-picker';
@@ -11,11 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import Avatar from '@/app/profile-avatar';
 import ClientMark from '@/app/client-mark';
 import ClientImages from '@/app/client-images';
-import { type RecordItem, type Status, statuses, safeLink, channels, dayKey } from '@/lib/model';
+import { type RecordItem, type Status, type DocStatus, statuses, safeLink, channels, dayKey } from '@/lib/model';
 import { flow, hoursLeft, revisionState, shiftDay } from '@/lib/flow';
 import { DonutStat, TrendArea, type Slice } from '@/components/dashboard-charts';
 import { Progress } from '@/components/ui/progress';
 import { portalCopy, portalLocaleFor, type PortalCopy } from '@/lib/portal-i18n';
+import { computeTotals, docLabels, docStatusLabels } from '@/lib/documents';
+import { buildDocumentPdf, downloadPdf } from '@/lib/document-pdf';
 import { readStoredLocale } from '@/lib/i18n';
 import { useI18n } from '@/app/locale-provider';
 import SettingsDialog from '@/app/settings-dialog';
@@ -45,6 +47,8 @@ function Chip({ status = 'À faire', copy }: { status?: RecordItem['status']; co
   const index = statuses.indexOf(status);
   return <span className={`status s${index}`}>{copy.status[status]}</span>;
 }
+// Reuses the same four status chip colors (gray/amber/orange/green) for the five document statuses.
+const docStatusClass: Record<DocStatus, string> = { draft: 's0', sent: 's1', accepted: 's3', paid: 's3', refused: 's2' };
 
 function NavItem({ icon: Icon, label, active, badge, onClick }: { icon: LucideIcon; label: string; active?: boolean; badge?: number; onClick: () => void }) {
   const { setOpenMobile } = useSidebar();
@@ -69,6 +73,7 @@ export default function Portal({ mode, records, client, user, workspaceId, route
   const [formError, setFormError] = useState('');
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [projectFilter, setProjectFilter] = useState('');
+  const [pdfBusy, setPdfBusy] = useState('');
 
   const projects = records.filter((r) => r.kind === 'project' && r.clientId === client.id && !r.archived);
   const tasks = records.filter((r) => r.kind === 'task' && r.clientId === client.id && !r.archived && (!r.projectId || projects.some((p) => p.id === r.projectId)));
@@ -79,6 +84,8 @@ export default function Portal({ mode, records, client, user, workspaceId, route
   const files = tasks.filter((t) => !!link(t) && (t.status === 'À valider' || t.status === 'Validé'));
   const myRequests = tasks.filter((t) => t.request).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const events = records.filter((r) => r.kind === 'event' && r.clientId === client.id && r.audience !== 'studio').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Already scoped to this client by portalView() server-side; re-filtered here defensively, same as tasks/projects above.
+  const documents = records.filter((r) => r.kind === 'document' && r.clientId === client.id && !r.archived).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const task = route.page === 'review' ? tasks.find((t) => t.id === route.id) ?? null : null;
   const tab = route.page === 'review' ? 'review' : route.tab || 'home';
   const pname = (id?: string) => projects.find((p) => p.id === id)?.name || '';
@@ -236,6 +243,33 @@ export default function Portal({ mode, records, client, user, workspaceId, route
     </>;
   }
 
+  async function downloadDocument(doc: RecordItem) {
+    setPdfBusy(doc.id);
+    try {
+      const bytes = await buildDocumentPdf({
+        docType: doc.docType!, number: doc.number!, docStatus: doc.docStatus || 'draft', studioName: 'The One Core',
+        clientName: client.name, issuedAt: doc.issuedAt, dueAt: doc.dueAt, validUntil: doc.validUntil,
+        lineItems: doc.lineItems || [], taxRate: doc.taxRate, notes: doc.notes,
+      });
+      downloadPdf(bytes, `${doc.number}.pdf`);
+    } catch { onError(copy.noDocuments); } finally { setPdfBusy(''); }
+  }
+
+  function DocumentsScreen() {
+    return <>
+      <div className="page-heading"><h1>{copy.documents}</h1><p>{client.name}</p></div>
+      {documents.length ? <div className="database-card"><div className="table-area"><Table className="portal-table"><TableHeader><TableRow><TableHead>{copy.colNumber}</TableHead><TableHead>{copy.colDocType}</TableHead><TableHead>{copy.colStatus}</TableHead><TableHead>{copy.colTotal}</TableHead><TableHead>{copy.colDate}</TableHead><TableHead /></TableRow></TableHeader>
+        <TableBody>{documents.map((doc) => { const { total } = computeTotals(doc.lineItems || [], doc.taxRate); return <TableRow key={doc.id}>
+          <TableCell><strong>{doc.number}</strong></TableCell>
+          <TableCell>{docLabels[doc.docType || 'devis']}</TableCell>
+          <TableCell><span className={`status ${docStatusClass[doc.docStatus || 'draft']}`}>{docStatusLabels[doc.docStatus || 'draft']}</span></TableCell>
+          <TableCell>{total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MAD</TableCell>
+          <TableCell>{fmt(doc.issuedAt)}</TableCell>
+          <TableCell onClick={(e) => e.stopPropagation()}><button className="file-pill" disabled={!!pdfBusy} onClick={() => void downloadDocument(doc)}>{pdfBusy === doc.id ? <Loader2 size={13} className="spin" /> : <Download size={13} />}{copy.download}</button></TableCell>
+        </TableRow>; })}</TableBody></Table></div></div> : <div className="portal-empty"><FileSignature size={28} /><h2>{copy.noDocuments}</h2><p>{copy.noDocumentsText}</p></div>}
+    </>;
+  }
+
   function RequestScreen() {
     return <>
       <div className="page-heading"><h1>{copy.requestTitle}</h1><p>{copy.requestText}</p></div>
@@ -283,7 +317,7 @@ export default function Portal({ mode, records, client, user, workspaceId, route
     </>;
   }
 
-  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'tasks' ? copy.tasks : tab === 'request' ? copy.request : copy.review;
+  const title = tab === 'home' ? copy.home : tab === 'calendar' ? copy.calendar : tab === 'files' ? copy.files : tab === 'tasks' ? copy.tasks : tab === 'documents' ? copy.documents : tab === 'request' ? copy.request : copy.review;
 
   return <div dir={copy.dir} lang={locale} className={`portal-root ${rtl ? 'portal-rtl' : ''}`}>
     <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
@@ -295,6 +329,7 @@ export default function Portal({ mode, records, client, user, workspaceId, route
           <NavItem icon={List} label={copy.tasks} active={tab === 'tasks'} onClick={() => go('tasks')} />
           <NavItem icon={CalendarDays} label={copy.calendar} active={tab === 'calendar'} onClick={() => go('calendar')} />
           <NavItem icon={FileText} label={copy.files} active={tab === 'files'} onClick={() => go('files')} />
+          <NavItem icon={FileSignature} label={copy.documents} active={tab === 'documents'} onClick={() => go('documents')} />
           <NavItem icon={Inbox} label={copy.request} active={tab === 'request'} onClick={() => go('request')} />
         </SidebarMenu></SidebarGroup></SidebarContent>
         <SidebarFooter>
@@ -307,7 +342,7 @@ export default function Portal({ mode, records, client, user, workspaceId, route
         {mode === 'preview' && <div className="preview-banner"><Eye size={16} /><span>{copy.previewBanner}</span><button className="text-link" onClick={onLeave}>{copy.leave}<ArrowUpRight size={14} /></button></div>}
         <div className="page-content">
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="btn" onClick={() => onError('')}>OK</button></div>}
-          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'tasks' ? TasksScreen() : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
+          {route.page === 'review' ? ReviewScreen() : tab === 'home' ? HomeScreen() : tab === 'calendar' ? <><div className="page-heading"><h1>{copy.calendar}</h1><p>{client.name}</p></div>{Calendar()}</> : tab === 'files' ? ListScreen({ items: files, title: copy.files, empty: copy.noFiles, emptyText: copy.noFilesText }) : tab === 'tasks' ? TasksScreen() : tab === 'documents' ? DocumentsScreen() : tab === 'request' ? RequestScreen() : ListScreen({ items: waiting, title: copy.review, empty: copy.nothingWaiting, emptyText: copy.nothingWaitingText })}
         </div>
       </main>
       {notice && <div className="toast" role="status"><CheckCircle2 size={17} />{notice}</div>}

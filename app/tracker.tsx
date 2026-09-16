@@ -46,6 +46,7 @@ import {
   ChevronDown,
   Building2,
   Settings2,
+  Library,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/app/locale-provider";
@@ -128,6 +129,8 @@ import { DonutStat, TrendArea, type Slice } from "@/components/dashboard-charts"
 import Annex from "@/app/annex";
 import ClientMark from "@/app/client-mark";
 import ClientImages from "@/app/client-images";
+import LibraryPage from "@/app/library-page";
+import ClientDocuments from "@/app/client-documents";
 import {
   courtOf,
   courtLabels,
@@ -2409,6 +2412,9 @@ export default function Tracker() {
             </TabsTrigger>
             <TabsTrigger value="tasks">{tr("Tâches")}</TabsTrigger>
             <TabsTrigger value="editorial">{tr("Plan éditorial")}</TabsTrigger>
+            {owner && (
+              <TabsTrigger value="documents">{tr("Devis & factures")}</TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
         {tab === "overview" ? (
@@ -2423,33 +2429,6 @@ export default function Tracker() {
                     "Aucun brief pour le moment. Modifiez la fiche pour préciser les objectifs et la direction de la marque.",
                   )}
               </p>
-              <div className="section-head second">
-                <h2>{tr("Liens utiles")}</h2>
-              </div>
-              {(
-                [
-                  ["Dossier partagé", client.drive],
-                  ["Contrat", client.contract],
-                ] as [string, string | undefined][]
-              ).map(([label, url]) => (
-                <div className="link-row" key={label}>
-                  <LinkIcon size={16} />
-                  {url ? (
-                    <a
-                      href={safeLink(url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {tr(label)}
-                      <ArrowUpRight size={14} />
-                    </a>
-                  ) : (
-                    <span>
-                      {tr(label)} {tr("· Aucun lien renseigné")}
-                    </span>
-                  )}
-                </div>
-              ))}
               <div className="section-head second">
                 <h2>{tr("Sous-projets en cours")}</h2>
                 <button
@@ -2634,6 +2613,14 @@ export default function Tracker() {
           </>
         ) : tab === "tasks" ? (
           TaskDatabase()
+        ) : tab === "documents" && owner ? (
+          <ClientDocuments
+            client={client}
+            records={records}
+            busy={busy}
+            onChange={mutate}
+            onError={setError}
+          />
         ) : (
           <>
             <div className="section-head">
@@ -3141,11 +3128,13 @@ export default function Tracker() {
           ? tr("Clients")
           : route.page === "team"
             ? tr("Équipe")
-            : route.page === "flow"
-              ? tr("Tableau de bord")
-              : route.page === "annex"
-                ? tr("Annexe contractuelle")
-                : client?.name || task?.name || tr("Espace");
+            : route.page === "library"
+              ? tr("Bibliothèque")
+              : route.page === "flow"
+                ? tr("Tableau de bord")
+                : route.page === "annex"
+                  ? tr("Annexe contractuelle")
+                  : client?.name || task?.name || tr("Espace");
   // Before the first /api/records reply comes back, we don't yet know whether the visitor is
   // signed in — auth defaults to false, so without this the studio shell would flash on screen
   // for everyone, logged in or not, right before swapping to the login screen.
@@ -3322,6 +3311,12 @@ export default function Tracker() {
                   label={tr("Équipe")}
                   active={route.page === "team"}
                   onClick={() => navigate({ page: "team" })}
+                />
+                <NavItem
+                  icon={Library}
+                  label={tr("Bibliothèque")}
+                  active={route.page === "library"}
+                  onClick={() => navigate({ page: "library" })}
                 />
                 {manager && (
                   <NavItem
@@ -3513,6 +3508,14 @@ export default function Tracker() {
               busy={busy}
               mailConfigured={mailConfigured}
               onChange={changeMember}
+              onRefresh={load}
+            />
+          ) : route.page === "library" ? (
+            <LibraryPage
+              records={records}
+              canEdit={!!workspace && workspace.role !== "viewer"}
+              busy={busy}
+              onChange={mutate}
               onRefresh={load}
             />
           ) : route.page === "flow" ? (

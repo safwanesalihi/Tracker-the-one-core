@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "idx_records_document_number" ON "records" USING btree ("workspace_id",(data->>'docType'),(data->>'number')) WHERE kind = 'document';

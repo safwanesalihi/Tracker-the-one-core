@@ -12,9 +12,17 @@ export type SignOff = {
   round: number;
 };
 
+export const libraryCategories = ['prompt', 'asset', 'plugin', 'preset'] as const;
+export type LibraryCategory = typeof libraryCategories[number];
+export const docTypes = ['devis', 'facture', 'contract'] as const;
+export type DocType = typeof docTypes[number];
+export const docStatuses = ['draft', 'sent', 'accepted', 'refused', 'paid'] as const;
+export type DocStatus = typeof docStatuses[number];
+export type LineItem = { description: string; quantity: number; unitPrice: number };
+
 export type RecordItem = {
   id: string;
-  kind: 'client' | 'project' | 'task' | 'comment' | 'event';
+  kind: 'client' | 'project' | 'task' | 'comment' | 'event' | 'library' | 'document';
   revision: number;
   name: string;
   clientId?: string;
@@ -60,6 +68,21 @@ export type RecordItem = {
   type?: 'reminder' | 'auto-approved' | 'sweep' | 'lock' | 'request' | 'decision' | 'client-added' | 'task-assigned';
   audience?: 'studio' | 'client' | 'both';
   read?: boolean;
+  // library fields — internal resources, every studio role (owner/admin/creative/viewer), never the client
+  category?: LibraryCategory;
+  content?: string;   // prompt text (category === 'prompt')
+  link?: string;       // external URL for asset/plugin/preset (category !== 'prompt')
+  // document fields (devis/facture/contract) — owner + that document's own client only
+  docType?: DocType;
+  number?: string;      // immutable once created, e.g. "FACTURE-2026-0001"
+  seq?: number;          // raw per-docType-per-year sequence backing `number`
+  docStatus?: DocStatus;
+  issuedAt?: string;
+  dueAt?: string;         // facture: payment due date
+  validUntil?: string;    // devis/contract: offer validity date
+  lineItems?: LineItem[];
+  taxRate?: number;       // percentage
+  notes?: string;
 };
 export function initials(name:string){return name.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();}
 export function dayKey(d:Date){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}

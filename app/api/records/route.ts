@@ -2,8 +2,9 @@ import { getAppUser, type AppUser } from '@/lib/auth';
 import { requestOrigin } from '@/lib/auth-settings';
 import { batch, database, type Statement } from '@/lib/database';
 import { env } from '@/lib/env';
-import { fields, inviteFields, requestFields } from '@/lib/validation';
-import { RecordItem, sampleRecords } from '@/lib/model';
+import { fields, inviteFields, requestFields, libraryFields, documentFields } from '@/lib/validation';
+import { RecordItem, sampleRecords, type DocStatus } from '@/lib/model';
+import { docPrefixes, docStatusesFor, docStatusLabels, nextDocNumber } from '@/lib/documents';
 import {
   canManageMembers, isManager, isStudioRole, isWorkspaceRole, roleLabels,
   type WorkspaceContext, type WorkspaceMember, type WorkspaceSummary,
@@ -120,6 +121,8 @@ const isMine = (user: AppUser, task: RecordItem) =>
 function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
   if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
   if (workspace.role === 'creative') return memberView(rows, identitiesOf(user), user.userId);
+  // Devis/factures/contrats are owner + client only — admin and viewer never see that they exist.
+  if (workspace.role !== 'owner') return rows.filter((r) => r.kind !== 'document');
   return rows;
 }
 
@@ -464,6 +467,28 @@ export async function POST(req: Request) {
       return result({ id: task.id });
     }
 
+    if (body.action === 'delete' && body.kind === 'library') {
+      if (!isStudioRole(workspace.role) || workspace.role === 'viewer') return response({ error: 'Votre rôle ne peut pas modifier la bibliothèque.' }, 403);
+      const item = rowsNow.find((r) => r.id === body.id && r.kind === 'library');
+      if (!item) return response({ error: 'Élément introuvable.' }, 404);
+      if (body.revision !== item.revision) return response({ error: 'Cet élément a changé. Actualisez avant de réessayer.' }, 409);
+      const deleted = await db.query('DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3 RETURNING id', [workspace.id, item.id, item.revision]);
+      if (!deleted.length) return response({ error: 'Cet élément a changé. Actualisez avant de réessayer.' }, 409);
+      return result();
+    }
+
+    if (body.action === 'delete' && body.kind === 'document') {
+      if (workspace.role !== 'owner') return response({ error: 'Seul le propriétaire peut supprimer un document.' }, 403);
+      const doc = rowsNow.find((r) => r.id === body.id && r.kind === 'document');
+      if (!doc) return response({ error: 'Document introuvable.' }, 404);
+      // A document the client may already have seen is never hard-deleted, only archived — the numbered history stays intact.
+      if (doc.docStatus !== 'draft') return response({ error: 'Seul un brouillon peut être supprimé ; archivez ce document à la place.' }, 409);
+      if (body.revision !== doc.revision) return response({ error: 'Ce document a changé. Actualisez avant de réessayer.' }, 409);
+      const deleted = await db.query('DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3 RETURNING id', [workspace.id, doc.id, doc.revision]);
+      if (!deleted.length) return response({ error: 'Ce document a changé. Actualisez avant de réessayer.' }, 409);
+      return result();
+    }
+
     if (body.action === 'delete') {
       if (!canManageMembers(workspace.role)) return response({ error: 'Seuls le propriétaire et les administrateurs peuvent supprimer une tâche.' }, 403);
       const task = rowsNow.find((r) => r.id === body.id && r.kind === 'task');
@@ -529,6 +554,114 @@ export async function POST(req: Request) {
         })));
       }
       return result();
+    }
+
+    // ----- library: shared team resources (prompts, assets, plugins, presets) — never the client -----
+
+    if (['create', 'update'].includes(body.action) && body.kind === 'library') {
+      if (!isStudioRole(workspace.role) || workspace.role === 'viewer') {
+        return response({ error: 'Votre rôle ne peut pas modifier la bibliothèque.' }, 403);
+      }
+      const existing = body.action === 'update' ? rowsNow.find((r) => r.id === body.id && r.kind === 'library') : undefined;
+      if (body.action === 'update' && !existing) return response({ error: 'Élément introuvable.' }, 404);
+      const parsed = libraryFields.safeParse(body.data);
+      if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
+      const item: RecordItem = {
+        ...existing, ...parsed.data, id: existing?.id || crypto.randomUUID(), kind: 'library', revision: existing?.revision ?? 1,
+        author: existing?.author || actor, createdAt: existing?.createdAt || now,
+        history: [...(existing?.history || []), { text: existing ? 'Modifié' : 'Ajouté', date: now }].slice(-100),
+      };
+      if (existing) {
+        if (body.revision !== existing.revision) return response({ error: 'Cet élément a changé. Actualisez avant de réessayer.' }, 409);
+        const changed = await db.query(
+          'UPDATE records SET data = $1::jsonb, revision = revision + 1 WHERE id = $2 AND workspace_id = $3 AND revision = $4 RETURNING id',
+          [JSON.stringify(item), existing.id, workspace.id, body.revision],
+        );
+        if (!changed.length) return response({ error: 'Modification simultanée. Actualisez votre espace.' }, 409);
+      } else {
+        await insert(item);
+      }
+      return result({ id: item.id });
+    }
+
+    // ----- devis / facture / contrat: owner-created and owner-managed, visible only to their own client -----
+
+    if (['create', 'update'].includes(body.action) && body.kind === 'document') {
+      if (workspace.role !== 'owner') return response({ error: 'Seul le propriétaire peut créer ou modifier un devis, une facture ou un contrat.' }, 403);
+      const existing = body.action === 'update' ? rowsNow.find((r) => r.id === body.id && r.kind === 'document') : undefined;
+      if (body.action === 'update' && !existing) return response({ error: 'Document introuvable.' }, 404);
+      const parsed = documentFields.safeParse(body.data);
+      if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
+      const data = parsed.data;
+      const docClient = rowsNow.find((r) => r.kind === 'client' && r.id === data.clientId && !r.archived);
+      if (!docClient) return response({ error: 'Sélectionnez un client actif.' }, 400);
+      const docStatus: DocStatus = data.docStatus || existing?.docStatus || 'draft';
+      if (!docStatusesFor[data.docType].includes(docStatus)) return response({ error: 'Statut invalide pour ce type de document.' }, 400);
+
+      if (existing) {
+        // Once it has left "draft", the client may already have seen it: lock the financial shape.
+        // Line items are compared field-by-field, not via JSON.stringify — Postgres jsonb does not
+        // preserve object key insertion order, so a round-tripped-but-unchanged item would otherwise
+        // look "different" the moment its key order happens to differ from the freshly-parsed input.
+        const sameLineItems = (a: typeof data.lineItems, b: typeof data.lineItems) =>
+          a.length === b.length && a.every((item, i) => item.description === b[i]?.description && item.quantity === b[i]?.quantity && item.unitPrice === b[i]?.unitPrice);
+        const locked = existing.docStatus !== 'draft' && (
+          !sameLineItems(existing.lineItems || [], data.lineItems)
+          || (existing.taxRate ?? 0) !== (data.taxRate ?? 0)
+          || existing.docType !== data.docType
+          || existing.clientId !== data.clientId
+        );
+        if (locked) return response({ error: 'Un document envoyé ne peut plus être modifié sur ses lignes ou son montant.' }, 409);
+        if (body.revision !== existing.revision) return response({ error: 'Ce document a changé. Actualisez avant de réessayer.' }, 409);
+        const statusChanged = docStatus !== existing.docStatus;
+        const item: RecordItem = {
+          ...existing, name: data.name || existing.name, lineItems: data.lineItems, taxRate: data.taxRate,
+          issuedAt: data.issuedAt, dueAt: data.dueAt, validUntil: data.validUntil, notes: data.notes,
+          archived: data.archived ?? existing.archived, docStatus,
+          history: [...(existing.history || []), { text: statusChanged ? `Statut : ${docStatusLabels[docStatus]}` : 'Modifié', date: now }].slice(-100),
+        };
+        const changed = await db.query(
+          'UPDATE records SET data = $1::jsonb, revision = revision + 1 WHERE id = $2 AND workspace_id = $3 AND revision = $4 RETURNING id',
+          [JSON.stringify(item), existing.id, workspace.id, body.revision],
+        );
+        if (!changed.length) return response({ error: 'Modification simultanée. Actualisez votre espace.' }, 409);
+        return result({ id: item.id });
+      }
+
+      // New document: assign the next number for this type this year. The unique index on
+      // (workspace, docType, number) is the real guarantee; a WHERE NOT EXISTS insert plus a
+      // short retry loop handles the rare case of two people creating one at the same instant.
+      const year = new Date(now).getFullYear();
+      let createdId: string | null = null;
+      for (let attempt = 0; attempt < 3 && !createdId; attempt++) {
+        const existingNumbers = await db.query<{ number: string }>(
+          `SELECT data->>'number' AS number FROM records WHERE workspace_id = $1 AND kind = 'document' AND data->>'docType' = $2 AND data->>'number' LIKE $3`,
+          [workspace.id, data.docType, `${docPrefixes[data.docType]}-${year}-%`],
+        );
+        const { seq, number } = nextDocNumber(existingNumbers.map((r) => r.number), data.docType, year);
+        const item: RecordItem = {
+          id: crypto.randomUUID(), kind: 'document', revision: 1, name: data.name || number,
+          docType: data.docType, number, seq, docStatus: 'draft', clientId: data.clientId,
+          lineItems: data.lineItems, taxRate: data.taxRate, issuedAt: data.issuedAt, dueAt: data.dueAt,
+          validUntil: data.validUntil, notes: data.notes, author: actor, createdAt: now,
+          history: [{ text: 'Créé', date: now }],
+        };
+        try {
+          const inserted = await db.query(
+            `INSERT INTO records (id, owner, workspace_id, kind, data, revision)
+             SELECT $1, $2, $3, 'document', $4::jsonb, 1
+             WHERE NOT EXISTS (SELECT 1 FROM records WHERE workspace_id = $3 AND kind = 'document' AND data->>'number' = $5)
+             RETURNING id`,
+            [item.id, owner, workspace.id, JSON.stringify(item), number],
+          );
+          if (inserted.length) createdId = item.id;
+        } catch (error) {
+          if ((error as { code?: string }).code !== '23505') throw error;
+          // Number taken meanwhile — loop and recompute from a fresh read.
+        }
+      }
+      if (!createdId) return response({ error: 'Numérotation en cours, réessayez.' }, 409);
+      return result({ id: createdId });
     }
 
     // ----- create / update -----

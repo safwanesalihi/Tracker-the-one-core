@@ -4,6 +4,19 @@
 .boot-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1c1e23}
 .boot-screen .auth-logo{margin:0;opacity:.92}
 
+/* Library and client documents — table toolbars reuse .section-head/.database-card/.table-area already defined elsewhere. */
+.library-page .database-card,.client-documents .database-card{margin-top:16px}
+.document-modal{max-width:680px!important}
+.document-lines{display:flex;flex-direction:column;gap:8px;margin:4px 0 14px}
+.document-line{display:grid;grid-template-columns:1fr 70px 100px 100px 30px;gap:8px;align-items:center}
+.document-line input{min-width:0}
+.document-line-total{font-size:13px;font-weight:500;text-align:right;color:#5d6778}
+.document-totals{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin:14px 0;padding-top:14px;border-top:1px solid #EDECEA;font-size:13px;color:#6b7280}
+.document-totals strong{color:#111;margin-left:8px}
+.document-total-big{font-size:16px;color:#111}
+.document-total-big strong{font-size:18px}
+@media (max-width:700px){.document-line{grid-template-columns:1fr}.document-line-total{text-align:left}}
+
 /* Court chip: who has to act. Studio = black dot, Client = gold dot, Terminé = check. Never typed, always derived. */
 .court{display:inline-flex;align-items:center;gap:6px;min-height:22px;padding:1px 8px 1px 6px;border:1px solid #EDECEA;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap;background:#fff}
 .court i{width:8px;height:8px;border-radius:50%;background:#111;display:inline-block}
