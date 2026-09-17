@@ -20,8 +20,9 @@ const { GET, POST } = await import(pathToFileURL(process.cwd() + '/.sites-runtim
 let checks = 0;
 const WS = 'ws:owner';
 const as = (user) => { globalThis.testUser = user; };
-async function post(body, status = 200) {
-  const r = await POST(new Request('https://tracker.test/api/records', { method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://tracker.test', 'X-Workspace-Id': WS }, body: JSON.stringify(body) }));
+async function post(body, status = 200) { return postTo(WS, body, status); }
+async function postTo(workspaceId, body, status = 200) {
+  const r = await POST(new Request('https://tracker.test/api/records', { method: 'POST', headers: { 'Content-Type': 'application/json', origin: 'https://tracker.test', 'X-Workspace-Id': workspaceId }, body: JSON.stringify(body) }));
   const d = await r.json(); assert.equal(r.status, status, JSON.stringify(d)); checks++; return d;
 }
 async function get(status = 200, workspaceId = WS) {
@@ -82,6 +83,9 @@ as(owner);
 const mine = await t('Story pour Yasmine', c1.id, p1.id, 'Yasmine Creative');
 as(yasmine);
 ok((await get()).records.some((r) => r.id === mine.id), 'tasks are created by the owner and assigned to members');
+// A member can also send their own task back to "À faire" (not just "À valider") — e.g. to un-claim work started by mistake.
+const backToTodo = await post({ action: 'update', kind: 'task', id: mine.id, revision: 1, data: { name: 'Story pour Yasmine', clientId: c1.id, projectId: p1.id, assignee: 'Yasmine Creative', status: 'À faire', due: '2026-12-01' } });
+eq(backToTodo.records.find((r) => r.id === mine.id).status, 'À faire', 'a member can move their own task back to "À faire"');
 await post({ action: 'create', kind: 'client', data: { name: 'Client créé par un membre', quota: '4' } }, 403);
 as(owner);
 const newClient = await post({ action: 'create', kind: 'client', data: { name: 'Client créé par le propriétaire', quota: '4' } });
@@ -201,5 +205,45 @@ await post({ action: 'update-profile', name: 'Yasmine Alaoui' });
 as(owner);
 eq((await get()).members.find((m) => m.userId === yasmine.userId).name, 'Yasmine Alaoui', 'roster reflects the new name');
 
+// Print workspace: a second workspace for the same owner, own clients, `print_operator` mirrors
+// `creative`'s scoping there. Also covers the invite-time existing-account fix and the per-task timer.
+as(owner);
+await post({ action: 'invite-member', email: 'karim@studio.test', name: 'Karim Print', role: 'print_operator' }, 400); // not offered in the content workspace
+const created = await post({ action: 'create-print-workspace' });
+eq(created.workspace.id, 'ws:owner:print', 'print workspace uses the expected deterministic id');
+eq(created.workspace.role, 'owner', 'the owner is owner in the print workspace too');
+eq((await post({ action: 'create-print-workspace' })).workspace.id, created.workspace.id, 'creating it again is idempotent');
+const PWS = created.workspace.id;
+await postTo(PWS, { action: 'invite-member', email: 'karim@studio.test', name: 'Karim Print', role: 'creative' }, 400); // not offered in the print workspace
+const karimInvite = await postTo(PWS, { action: 'invite-member', email: 'karim@studio.test', name: 'Karim Print', role: 'print_operator' });
+const karimId = karimInvite.members.find((m) => m.email === 'karim@studio.test').userId;
+
+// Attaching an email that already has an account elsewhere must not reset its password or sessions.
+const beforeAttach = (await db.query('SELECT password_hash FROM users WHERE email = $1', ['yasmine@studio.test']))[0];
+const attach = await postTo(PWS, { action: 'invite-member', email: 'yasmine@studio.test', name: 'Yasmine Creative', role: 'print_operator' });
+ok(attach.invitation.existingAccount, 'attaching an existing account is flagged, not treated as a fresh invite');
+const afterAttach = (await db.query('SELECT password_hash FROM users WHERE email = $1', ['yasmine@studio.test']))[0];
+eq(afterAttach.password_hash, beforeAttach.password_hash, 'the existing account’s password is untouched by gaining a second workspace');
+
+const pc1 = await postTo(PWS, { action: 'create', kind: 'client', data: { name: 'Client Impression' } });
+const pp1 = await postTo(PWS, { action: 'create', kind: 'project', data: { name: 'Projet Impression', clientId: pc1.id } });
+const karimTask = await postTo(PWS, { action: 'create', kind: 'task', data: { name: 'Flyer', clientId: pc1.id, projectId: pp1.id, assignee: 'Karim Print', status: 'En cours', due: '2026-12-01' } });
+await postTo(PWS, { action: 'create', kind: 'task', data: { name: 'Carte de visite', clientId: pc1.id, projectId: pp1.id, assignee: 'Yasmine Creative', status: 'En cours', due: '2026-12-01' } });
+as({ userId: karimId, fullName: 'Karim Print', displayName: 'Karim Print', email: 'karim@studio.test' });
+const karimView = await get(200, PWS);
+eq(karimView.workspace.role, 'print_operator');
+eq(ids(karimView, 'task'), [karimTask.id], 'a print operator only sees their own task in this workspace, mirroring a creative member');
+
+// Per-person timer: start logs an open entry, a second start on the same task is rejected, stop closes it.
+const started = await postTo(PWS, { action: 'start-timer', taskId: karimTask.id });
+const running = started.records.find((r) => r.id === karimTask.id);
+eq(running.timeEntries.length, 1, 'starting the timer logs one entry');
+ok(!running.timeEntries[0].end, 'the entry has no end while running');
+await postTo(PWS, { action: 'start-timer', taskId: karimTask.id }, 409);
+const stopped = await postTo(PWS, { action: 'stop-timer', taskId: karimTask.id });
+ok(stopped.records.find((r) => r.id === karimTask.id).timeEntries[0].end, 'stopping closes the entry');
+await postTo(PWS, { action: 'stop-timer', taskId: karimTask.id }, 409);
+as(owner);
+
 await pg.close();
-console.log(`${checks} role checks passed: single owner, member scope (clients, own + unassigned tasks, no task creation, read-only team), client portal scope.`);
+console.log(`${checks} role checks passed: single owner, member scope (clients, own + unassigned tasks, no task creation, read-only team), client portal scope, print workspace + timer.`);

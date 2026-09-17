@@ -59,6 +59,12 @@
 .receipt strong{font-size:12px}
 .receipt small{font-size:11px;color:#444;overflow-wrap:anywhere}
 
+/* Time tracker */
+.time-tracker{margin-top:8px}
+.time-breakdown{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.time-breakdown li{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#444}
+.time-breakdown li.time-total{border-top:1px solid #EDECEA;margin-top:4px;padding-top:6px;font-weight:600;color:#111}
+
 /* Home alerts */
 .alerts-panel{background:#fff;border:1px solid #e5e8ee;border-radius:12px;box-shadow:0 3px 8px #202b3d03;padding:20px 22px 8px;margin-bottom:25px}
 .alerts-list{display:flex;flex-direction:column}

@@ -6,7 +6,7 @@ import { fields, inviteFields, requestFields, libraryFields, documentFields } fr
 import { RecordItem, sampleRecords, type DocStatus } from '@/lib/model';
 import { docPrefixes, docStatusesFor, docStatusLabels, nextDocNumber } from '@/lib/documents';
 import {
-  canManageMembers, isManager, isStudioRole, isWorkspaceRole, roleLabels,
+  canManageMembers, invitableRolesFor, isManager, isMemberRole, isStudioRole, isWorkspaceRole, roleLabels,
   type WorkspaceContext, type WorkspaceMember, type WorkspaceSummary,
 } from '@/lib/workspace';
 import {
@@ -29,6 +29,10 @@ async function identity(req?: Request) {
 }
 
 const workspaceIdFor = (owner: string) => `ws:${owner}`;
+// The print side of the business: a second, independent workspace for the same owner — its own
+// clients/projects/tasks, reached by the existing workspace switcher once it exists. Detecting one
+// from a bare id (no DB round-trip) lives in lib/workspace.ts as `isPrintWorkspaceId`.
+const printWorkspaceIdFor = (owner: string) => `${workspaceIdFor(owner)}:print`;
 
 async function one<T>(text: string, params: unknown[] = []) {
   return (await database().query<T>(text, params))[0] ?? null;
@@ -37,9 +41,8 @@ async function one<T>(text: string, params: unknown[] = []) {
 type MembershipRow = { id: string; name: string; role: string; clientId: string | null };
 const membershipSelect = 'SELECT w.id, w.name, wm.role, wm.client_id AS "clientId"';
 
-async function ensureWorkspace(owner: string, name: string): Promise<WorkspaceContext> {
+async function ensureWorkspaceRecord(id: string, owner: string, name: string): Promise<WorkspaceContext> {
   const now = new Date().toISOString();
-  const id = workspaceIdFor(owner);
   await batch(database(), [
     { text: 'INSERT INTO workspaces (id, name, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) ON CONFLICT (id) DO NOTHING', params: [id, name, owner, now] },
     { text: `INSERT INTO workspace_members (workspace_id, user_id, role, created_at)
@@ -53,6 +56,9 @@ async function ensureWorkspace(owner: string, name: string): Promise<WorkspaceCo
   if (!workspace || !isWorkspaceRole(workspace.role)) throw new WorkspaceAccessError();
   return { id: workspace.id, name: workspace.name, role: workspace.role, clientId: workspace.clientId };
 }
+const ensureWorkspace = (owner: string, name: string) => ensureWorkspaceRecord(workspaceIdFor(owner), owner, name);
+// Only ever called from the owner-gated 'create-print-workspace' action, never auto-provisioned.
+const ensurePrintWorkspace = (owner: string, name: string) => ensureWorkspaceRecord(printWorkspaceIdFor(owner), owner, name);
 
 const membershipOrder = 'ORDER BY CASE WHEN w.created_by = wm.user_id THEN 1 ELSE 0 END, wm.created_at ASC, w.id ASC';
 // Only the owner ever holds a workspace of their own; a leftover one on any other account is never offered.
@@ -120,7 +126,7 @@ const isMine = (user: AppUser, task: RecordItem) =>
 
 function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
   if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
-  if (workspace.role === 'creative') return memberView(rows, identitiesOf(user), user.userId);
+  if (isMemberRole(workspace.role)) return memberView(rows, identitiesOf(user), user.userId);
   // Devis/factures/contrats are owner + client only — admin and viewer never see that they exist.
   if (workspace.role !== 'owner') return rows.filter((r) => r.kind !== 'document');
   return rows;
@@ -209,7 +215,7 @@ export async function POST(req: Request) {
       const task = rows.find((r) => r.id === id && r.kind === 'task');
       if (!task || parentArchived(rows, task)) return null;
       if (workspace.role === 'client' && task.clientId !== workspace.clientId) return null;
-      if (workspace.role === 'creative' && !isMine(user, task)) return null;
+      if (isMemberRole(workspace.role) && !isMine(user, task)) return null;
       return task;
     };
 
@@ -272,6 +278,7 @@ export async function POST(req: Request) {
       if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
       const { email, role, name } = parsed.data;
       if (isOwnerEmail(email)) return response({ error: 'Cette adresse est celle du propriétaire.' }, 400);
+      if (!invitableRolesFor(workspace.id).includes(role)) return response({ error: 'Ce rôle n’est pas proposé dans cet espace.' }, 400);
       let clientId: string | null = null;
       let clientLogo: string | undefined;
       if (role === 'client') {
@@ -284,15 +291,35 @@ export async function POST(req: Request) {
         'SELECT user_id AS "userId" FROM workspace_members WHERE workspace_id = $1 AND lower(email) = $2', [workspace.id, email],
       );
       if (duplicate) return response({ error: 'Cette adresse est déjà membre de l’espace. Utilisez « Renvoyer l’invitation » pour un nouveau mot de passe temporaire.' }, 409);
-      const account = await provisionAccount(db, email, name ?? '');
-      await db.query(
+      const attachMembership = (userId: string) => db.query(
         `INSERT INTO workspace_members (workspace_id, user_id, role, name, email, client_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, client_id = EXCLUDED.client_id, name = COALESCE(EXCLUDED.name, workspace_members.name)`,
-        [workspace.id, account.userId, role, name || null, email, clientId, now],
+        [workspace.id, userId, role, name || null, email, clientId, now],
       );
+      // Someone who already has an account (e.g. via another workspace, like a designer gaining
+      // print-operator access too) just gets attached here — provisioning a fresh temporary password
+      // would silently reset the one they already use and sign them out everywhere, which is exactly
+      // wrong for a person who already knows how to log in.
+      const existingAccount = await one<{ id: string }>('SELECT id FROM users WHERE email = $1', [email]);
+      if (existingAccount) {
+        await attachMembership(existingAccount.id);
+        if (role === 'client' && clientLogo) await syncMemberAvatar(existingAccount.id, clientLogo);
+        const url = env.AUTH_URL ?? new URL(req.url).origin;
+        return response({ workspace, members: await members(workspace.id, true), invitation: { email, sent: false, existingAccount: true, url } });
+      }
+      const account = await provisionAccount(db, email, name ?? '');
+      await attachMembership(account.userId);
       if (role === 'client' && clientLogo) await syncMemberAvatar(account.userId, clientLogo);
       const invitation = await deliver(email, name ?? '', roleLabels[role], account.temporaryPassword, false);
       return response({ workspace, members: await members(workspace.id, true), invitation });
+    }
+
+    if (body.action === 'create-print-workspace') {
+      if (!isOwnerEmail(user.email)) return response({ error: 'Seul le propriétaire peut créer l’espace Impression.' }, 403);
+      const printWorkspace = await ensurePrintWorkspace(owner, 'Impression');
+      // Full payload scoped to the new workspace (not `workspace`, the current request's context) —
+      // same shape `result()` returns, so the client can drop straight into it, already switched.
+      return response(await payload(printWorkspace, user));
     }
 
     if (body.action === 'renew-invitation') {
@@ -314,6 +341,9 @@ export async function POST(req: Request) {
       }
       if (body.action === 'set-member-role' && (!isWorkspaceRole(body.role) || body.role === 'owner')) {
         return response({ error: 'Rôle invalide.' }, 400);
+      }
+      if (body.action === 'set-member-role' && !invitableRolesFor(workspace.id).includes(body.role) && body.role !== 'viewer') {
+        return response({ error: 'Ce rôle n’est pas proposé dans cet espace.' }, 400);
       }
       if (!isWorkspaceRole(body.expectedRole)) return response({ error: 'Actualisez la liste des membres avant de réessayer.' }, 400);
       let clientId: string | null = null;
@@ -435,10 +465,60 @@ export async function POST(req: Request) {
       return result({ id: task.id });
     }
 
+    // ----- time tracking: per-person, at most one running clock per user across the workspace -----
+
+    if (body.action === 'start-timer' || body.action === 'stop-timer') {
+      if (!canWrite(workspace.role)) return response({ error: 'Votre rôle ne peut pas suivre le temps.' }, 403);
+      const task = findTask(rowsNow, body.taskId);
+      if (!task) return response({ error: 'Tâche introuvable.' }, 404);
+      const entries = task.timeEntries || [];
+      const myOpenIndex = entries.findIndex((e) => e.userId === user.userId && !e.end);
+
+      if (body.action === 'stop-timer') {
+        if (myOpenIndex === -1) return response({ error: 'Aucun chronomètre en cours pour cette tâche.' }, 409);
+        const after = { ...task, timeEntries: entries.map((e, i) => (i === myOpenIndex ? { ...e, end: now } : e)) };
+        if (!(await saveTask(task, after))) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
+        return result({ id: task.id });
+      }
+
+      if (myOpenIndex !== -1) return response({ error: 'Le chronomètre est déjà en cours pour cette tâche.' }, 409);
+      const newEntry = { userId: user.userId, name: actor, start: now };
+      // Nobody runs two clocks at once: find any other task where this user's clock is still running.
+      const otherOpenTask = rowsNow.find(
+        (r) => r.kind === 'task' && r.id !== task.id && r.timeEntries?.some((e) => e.userId === user.userId && !e.end),
+      );
+      if (!otherOpenTask) {
+        const after = { ...task, timeEntries: [...entries, newEntry] };
+        if (!(await saveTask(task, after))) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
+        return result({ id: task.id });
+      }
+      // Two records change together here, so `saveTask` (built for one) doesn't apply — close the
+      // other task's clock and open this one's in a single transaction, exactly like the task-delete
+      // cascade above: either both writes land, or neither does.
+      const otherEntries = otherOpenTask.timeEntries || [];
+      const otherOpenIndex = otherEntries.findIndex((e) => e.userId === user.userId && !e.end);
+      const otherAfter = { ...otherOpenTask, timeEntries: otherEntries.map((e, i) => (i === otherOpenIndex ? { ...e, end: now } : e)) };
+      const taskAfter = { ...task, timeEntries: [...entries, newEntry] };
+      const ok = await db.transaction(async (tx) => {
+        const closedOther = await tx.query(
+          'UPDATE records SET data = $1::jsonb, revision = revision + 1 WHERE id = $2 AND workspace_id = $3 AND revision = $4 RETURNING id',
+          [JSON.stringify(otherAfter), otherOpenTask.id, workspace.id, otherOpenTask.revision],
+        );
+        if (!closedOther.length) return false;
+        const openedThis = await tx.query(
+          'UPDATE records SET data = $1::jsonb, revision = revision + 1 WHERE id = $2 AND workspace_id = $3 AND revision = $4 RETURNING id',
+          [JSON.stringify(taskAfter), task.id, workspace.id, task.revision],
+        );
+        return openedThis.length > 0;
+      });
+      if (!ok) return response({ error: 'Cette tâche a changé. Actualisez avant de réessayer.' }, 409);
+      return result({ id: task.id });
+    }
+
     // ----- request bank: the portal form -----
 
     if (body.action === 'request') {
-      if (workspace.role === 'viewer' || workspace.role === 'creative') return response({ error: 'Seuls les administrateurs saisissent une demande au nom d’un client.' }, 403);
+      if (workspace.role === 'viewer' || isMemberRole(workspace.role)) return response({ error: 'Seuls les administrateurs saisissent une demande au nom d’un client.' }, 403);
       const clientId = workspace.role === 'client' ? workspace.clientId : body.clientId;
       const client = rowsNow.find((r) => r.kind === 'client' && r.id === clientId && !r.archived);
       if (!client) return response({ error: 'Client introuvable.' }, 404);
@@ -685,8 +765,8 @@ export async function POST(req: Request) {
         : undefined;
     if (body.action === 'update' && !existing) return response({ error: 'Élément introuvable.' }, 404);
     // A member edits only the tasks within their reach; tasks are created by owners and admins. Clients and sub-projects are shared work.
-    if (workspace.role === 'creative' && body.kind === 'task' && !existing) return response({ error: 'Les tâches sont créées par le propriétaire ou un administrateur.' }, 403);
-    if (workspace.role === 'creative' && existing?.kind === 'task' && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
+    if (isMemberRole(workspace.role) && body.kind === 'task' && !existing) return response({ error: 'Les tâches sont créées par le propriétaire ou un administrateur.' }, 403);
+    if (isMemberRole(workspace.role) && existing?.kind === 'task' && !isMine(user, existing)) return response({ error: 'Élément introuvable.' }, 404);
 
     const parsed = fields.safeParse(body.data);
     if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
@@ -708,16 +788,16 @@ export async function POST(req: Request) {
         return response({ error: 'Choisissez une personne de l’équipe pour l’assignation.' }, 400);
       }
     }
-    if (workspace.role === 'creative' && !!data.archived !== !!existing?.archived) {
+    if (isMemberRole(workspace.role) && !!data.archived !== !!existing?.archived) {
       return response({ error: 'Seuls les administrateurs peuvent archiver ou restaurer des éléments.' }, 403);
     }
-    // A member's only edits on a task are the deliverable link and moving it between "En cours"
-    // and "À valider"; every other field (and "À faire"/"Validé") is off-limits for them.
+    // A member's only edits on a task are the deliverable link and moving it between "À faire",
+    // "En cours" and "À valider"; every other field (and "Validé") is off-limits for them.
     // Falsy values (undefined/null/false/'') are treated as equivalent so an unset field sent back
     // as its default (e.g. archived: false) is never mistaken for a change. "publishable" is the
     // one field that defaults to true when unset (the form always resends a real boolean for it),
     // so it gets the same "unset means true" normalization used everywhere else it's read.
-    if (workspace.role === 'creative' && body.kind === 'task' && existing) {
+    if (isMemberRole(workspace.role) && body.kind === 'task' && existing) {
       const memberEditableFields = new Set(['deliverable', 'status']);
       const normalize = (key: string, value: unknown) => (key === 'publishable' ? value !== false : value || null);
       const touchedFields = (Object.keys(data) as (keyof typeof data)[]).filter(
@@ -726,8 +806,8 @@ export async function POST(req: Request) {
       if (touchedFields.some((key) => !memberEditableFields.has(key as string))) {
         return response({ error: 'Un membre ne peut modifier que le lien livrable et le statut de cette tâche.' }, 403);
       }
-      if (touchedFields.includes('status') && !['En cours', 'À valider'].includes(data.status || '')) {
-        return response({ error: 'Un membre ne peut passer une tâche qu’en cours ou à valider.' }, 403);
+      if (touchedFields.includes('status') && !['À faire', 'En cours', 'À valider'].includes(data.status || '')) {
+        return response({ error: 'Un membre ne peut pas passer une tâche à ce statut.' }, 403);
       }
     }
     if (existing?.archived && data.archived !== false) {
@@ -758,7 +838,7 @@ export async function POST(req: Request) {
       if (data.status === previousStatus && existing?.status !== 'Validé' && data.deliverable && data.deliverable !== existing?.deliverable) {
         data.status = 'À valider';
       }
-      if (workspace.role === 'creative' && data.status === 'Validé' && existing?.status !== 'Validé') {
+      if (isMemberRole(workspace.role) && data.status === 'Validé' && existing?.status !== 'Validé') {
         return response({ error: 'Seuls le client, le propriétaire ou un administrateur peuvent valider un livrable.' }, 403);
       }
       if (['À valider', 'Validé'].includes(data.status) && !data.deliverable) {

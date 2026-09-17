@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import Avatar from '@/app/profile-avatar';
-import { canManageMembers, invitableRoles, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type Invitation, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
+import { canManageMembers, invitableRolesFor, memberName, roleDescriptions, roleLabels, workspaceRoles, type EditableRole, type Invitation, type MemberChange, type WorkspaceContext, type WorkspaceMember } from '@/lib/workspace';
 import type { RecordItem } from '@/lib/model';
 import { useI18n } from '@/app/locale-provider';
 import { buildInvitePdf, downloadPdf } from '@/lib/invite-pdf';
@@ -31,9 +31,10 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   const [filter, setFilter] = useState('all');
   const [editing, setEditing] = useState<WorkspaceMember | null>(null);
   const [removing, setRemoving] = useState<WorkspaceMember | null>(null);
+  const availableRoles = invitableRolesFor(workspace?.id || '');
   const [role, setRole] = useState<EditableRole>('viewer');
   const [roleClient, setRoleClient] = useState('');
-  const [invite, setInvite] = useState({ email: '', name: '', role: 'creative' as EditableRole, clientId: '' });
+  const [invite, setInvite] = useState({ email: '', name: '', role: availableRoles[0], clientId: '' });
   const [inviteError, setInviteError] = useState('');
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [inviteContext, setInviteContext] = useState<{ name: string; role: EditableRole } | null>(null);
@@ -163,14 +164,16 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         <form className="team-invite-form" onSubmit={sendInvite}>
           <label className="form-field"><span>{t('Nom')}</span><input required maxLength={120} value={invite.name} disabled={disabled} onChange={(event) => setInvite({ ...invite, name: event.target.value })} placeholder={t('Prénom Nom')} /></label>
           <label className="form-field"><span>{t('Adresse e-mail')}</span><input type="email" required maxLength={200} value={invite.email} disabled={disabled} onChange={(event) => setInvite({ ...invite, email: event.target.value })} placeholder={t('prenom@entreprise.com')} /></label>
-          <label className="form-field"><span>{t('Rôle')}</span><Select value={invite.role} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, role: value as EditableRole })}><SelectTrigger className="pick" aria-label={t('Rôle de l’invité')}><SelectValue /></SelectTrigger><SelectContent>{invitableRoles.map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent></Select></label>
+          <label className="form-field"><span>{t('Rôle')}</span><Select value={invite.role} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, role: value as EditableRole })}><SelectTrigger className="pick" aria-label={t('Rôle de l’invité')}><SelectValue /></SelectTrigger><SelectContent>{availableRoles.map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent></Select></label>
           {invite.role === 'client' && <label className="form-field"><span>{t('Client')}</span><Select value={invite.clientId || '__none'} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, clientId: value === '__none' ? '' : value })}><SelectTrigger className="pick" aria-label={t('Client de l’invité')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{t('Choisir un client')}</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <button className="btn primary" disabled={disabled || (invite.role === 'client' && !invite.clientId)}><UserPlus size={15} />{saving ? t('Envoi…') : mailConfigured ? t('Envoyer l’invitation') : t('Créer l’accès')}</button>
         </form>
         <p className="team-role-description">{t(roleDescriptions[invite.role])}</p>
         {inviteError && <p className="form-error" role="alert">{inviteError}</p>}
         {invitation && <div className={`team-invitation ${invitation.sent ? 'sent' : ''}`} role="status">
-          {invitation.sent
+          {invitation.existingAccount
+            ? <><UserPlus size={18} /><div><strong>{t('Accès ajouté pour {email}', { email: invitation.email })}</strong><p>{t('Cette personne a déjà un compte : elle se connecte comme d’habitude, avec son mot de passe existant.')}</p></div></>
+            : invitation.sent
             ? <><MailCheck size={18} /><div><strong>{t('Invitation envoyée à {email}', { email: invitation.email })}</strong><p>{t('Le mot de passe temporaire est dans l’e-mail. À sa première connexion, la personne choisira son mot de passe.')}</p></div></>
             : <><KeyRound size={18} /><div><strong>{t('Accès créé pour {email}', { email: invitation.email })}</strong>{invitation.error && <p className="form-error">{invitation.error}</p>}<p>{t('Transmettez ces informations à la personne (elle changera le mot de passe à sa première connexion) :')}</p>
               <dl><div><dt>{t('Adresse')}</dt><dd>{invitation.url}</dd></div><div><dt>{t('Identifiant')}</dt><dd>{invitation.email}</dd></div><div><dt>{t('Mot de passe temporaire')}</dt><dd><code>{invitation.temporaryPassword}</code><button type="button" className="icon-button" aria-label={t('Copier le mot de passe temporaire')} onClick={async () => { try { await navigator.clipboard.writeText(invitation.temporaryPassword ?? ''); setCopyFeedback(t('Copié')); } catch { setCopyFeedback(t('Copie impossible. Sélectionnez le mot de passe pour le copier.')); } }}><Copy size={13} /></button>{copyFeedback && <small role="status">{copyFeedback}</small>}</dd></div></dl>
@@ -216,7 +219,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <DialogContent className="tracker-modal team-modal" onCloseAutoFocus={(event) => { event.preventDefault(); opener.current?.focus(); }}>
         <DialogHeader><DialogTitle>{t('Modifier le rôle')}</DialogTitle><DialogDescription>{t('{name} · Le nouvel accès prend effet dès l’enregistrement.', { name: editing ? memberName(editing) : '' })}</DialogDescription></DialogHeader>
         <form onSubmit={(event) => { event.preventDefault(); if (editing) void save({ action: 'set-member-role', userId: editing.userId, expectedRole: editing.role, role, ...(role === 'client' ? { clientId: roleClient } : {}) }); }}>
-          <label className="form-field"><span>{t('Rôle dans l’espace')}</span><Select value={role} disabled={disabled} onValueChange={(value) => setRole(value as EditableRole)}><SelectTrigger className="pick" aria-label={t('Nouveau rôle')}><SelectValue /></SelectTrigger><SelectContent>{[...invitableRoles, ...(editing?.role === 'viewer' ? ['viewer' as const] : [])].map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent></Select></label>
+          <label className="form-field"><span>{t('Rôle dans l’espace')}</span><Select value={role} disabled={disabled} onValueChange={(value) => setRole(value as EditableRole)}><SelectTrigger className="pick" aria-label={t('Nouveau rôle')}><SelectValue /></SelectTrigger><SelectContent>{[...availableRoles, ...(editing?.role === 'viewer' ? ['viewer' as const] : [])].map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent></Select></label>
           {role === 'client' && <label className="form-field"><span>{t('Client')}</span><Select value={roleClient || '__none'} disabled={disabled} onValueChange={(value) => setRoleClient(value === '__none' ? '' : value)}><SelectTrigger className="pick" aria-label={t('Client')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{t('Choisir un client')}</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <p className="team-role-description">{t(roleDescriptions[role])}</p>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}

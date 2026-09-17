@@ -250,7 +250,7 @@ export const statusOrder: readonly Status[] = ['À faire', 'En cours', 'À valid
 
 // ---------- what a client contact may see ----------
 
-const clientHiddenTaskFields = ['assignee', 'assigneeId', 'source', 'lockOverride', 'reminders', 'demo'] as const;
+const clientHiddenTaskFields = ['assignee', 'assigneeId', 'source', 'lockOverride', 'reminders', 'demo', 'timeEntries'] as const;
 
 /** The portal slice of a workspace: one client, its projects, tasks, comments and client-facing events. */
 export function portalView(records: RecordItem[], clientId: string): RecordItem[] {

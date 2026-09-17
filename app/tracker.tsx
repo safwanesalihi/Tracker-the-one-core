@@ -47,6 +47,9 @@ import {
   Building2,
   Settings2,
   Library,
+  Printer,
+  Play,
+  Pause,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/app/locale-provider";
@@ -116,6 +119,8 @@ import {
   roleLabels,
   canManageMembers,
   isManager,
+  isMemberRole,
+  isPrintWorkspaceId,
   type WorkspaceContext,
   type WorkspaceMember,
   type WorkspaceSummary,
@@ -190,6 +195,99 @@ function CourtChip({ task }: { task: RecordItem }) {
     </span>
   );
 }
+// Per-person time-tracking: group raw start/end entries by who logged them, summing closed spans
+// plus the live span for anyone still running (nowMs lets the caller freeze or live-tick the total).
+function timerTotals(
+  entries: { userId: string; name: string; start: string; end?: string }[] = [],
+  nowMs: number,
+) {
+  const byUser = new Map<string, { userId: string; name: string; ms: number; running: boolean }>();
+  for (const e of entries) {
+    const ms = Math.max(0, (e.end ? new Date(e.end).getTime() : nowMs) - new Date(e.start).getTime());
+    const prev = byUser.get(e.userId);
+    byUser.set(e.userId, { userId: e.userId, name: e.name, ms: (prev?.ms || 0) + ms, running: !!prev?.running || !e.end });
+  }
+  return [...byUser.values()].sort((a, b) => b.ms - a.ms);
+}
+function formatDuration(ms: number) {
+  const totalMinutes = Math.round(ms / 60000);
+  const h = Math.floor(totalMinutes / 60),
+    m = totalMinutes % 60;
+  if (h === 0 && m === 0) return "< 1 min";
+  return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, "0") : ""}` : `${m} min`;
+}
+// Ticks once a second on its own so a running timer feels live without re-rendering the whole task page.
+function LiveElapsed({ startedAt }: { startedAt: string }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const totalSeconds = Math.floor((nowMs - new Date(startedAt).getTime()) / 1000);
+  const hh = Math.floor(totalSeconds / 3600),
+    mm = Math.floor((totalSeconds % 3600) / 60),
+    ss = totalSeconds % 60;
+  return (
+    <>
+      {hh > 0 ? `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${mm}:${String(ss).padStart(2, "0")}`}
+    </>
+  );
+}
+function TimeTracker({
+  task,
+  currentUserId,
+  busy,
+  onStart,
+  onStop,
+}: {
+  task: RecordItem;
+  currentUserId: string;
+  busy: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  const { t: tr } = useI18n();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const totals = timerTotals(task.timeEntries, nowMs);
+  const mine = totals.find((p) => p.userId === currentUserId);
+  const myOpenEntry = task.timeEntries?.find((e) => e.userId === currentUserId && !e.end);
+  return (
+    <div className="time-tracker">
+      <button
+        type="button"
+        className={`btn ${mine?.running ? "" : "primary"}`}
+        disabled={busy}
+        onClick={mine?.running ? onStop : onStart}
+      >
+        {mine?.running ? <Pause size={14} /> : <Play size={14} />}
+        {mine?.running && myOpenEntry ? <LiveElapsed startedAt={myOpenEntry.start} /> : tr("Démarrer")}
+      </button>
+      {totals.length > 0 && (
+        <ul className="time-breakdown">
+          {totals.map((p) => (
+            <li key={p.userId}>
+              <span>
+                {p.name}
+                {p.running && p.userId !== currentUserId ? ` · ${tr("en cours")}` : ""}
+              </span>
+              <strong>{formatDuration(p.ms)}</strong>
+            </li>
+          ))}
+          {totals.length > 1 && (
+            <li className="time-total">
+              <span>{tr("Total")}</span>
+              <strong>{formatDuration(totals.reduce((sum, p) => sum + p.ms, 0))}</strong>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 function Chip({ status = "À faire" }: { status?: Status }) {
   const { t: tr } = useI18n();
   return (
@@ -238,7 +336,7 @@ function StatusPick({
       </SelectTrigger>
       <SelectContent position="popper" align="start">
         {(member
-          ? statuses.filter((s) => s === "En cours" || s === "À valider" || s === task.status)
+          ? statuses.filter((s) => s === "À faire" || s === "En cours" || s === "À valider" || s === task.status)
           : allowApproval
             ? [...statuses]
             : statuses.filter((s) => s !== "À valider" && s !== "Validé")
@@ -783,6 +881,7 @@ export default function Tracker() {
       "lockOverride",
       "reminders",
       "request",
+      "timeEntries",
     ].forEach((k) => delete d[k]);
     if (d.deliverable === "/demo-deliverable.html") d.deliverable = "";
     return d;
@@ -820,9 +919,9 @@ export default function Tracker() {
   const clients = records.filter((r) => r.kind === "client"),
     projects = records.filter((r) => r.kind === "project");
   const owner = workspace?.role === "owner";
-  const writable = !!workspace && ["owner", "admin", "creative"].includes(workspace.role);
+  const writable = !!workspace && (["owner", "admin"].includes(workspace.role) || isMemberRole(workspace.role));
   const manager = !!workspace && isManager(workspace.role),
-    member = workspace?.role === "creative";
+    member = !!workspace && isMemberRole(workspace.role);
   // A member's only edit on a task is the deliverable link; every other field stays locked.
   const memberTaskOnly = member && modal?.type === "task" && !!modal.record;
   const archived = (r: RecordItem) =>
@@ -3042,7 +3141,7 @@ export default function Tracker() {
                       manager
                         ? [...statuses]
                         : member
-                          ? statuses.filter((s) => s === "En cours" || s === "À valider" || s === task.status)
+                          ? statuses.filter((s) => s === "À faire" || s === "En cours" || s === "À valider" || s === task.status)
                           : statuses.filter((s) => s !== "Validé" && (s !== "À valider" || task.status === "À valider"))
                     }
                   />
@@ -3075,6 +3174,18 @@ export default function Tracker() {
                   </small>
                 </div>
               </div>
+            )}
+            {writable && (
+              <>
+                <h3>{tr("TEMPS")}</h3>
+                <TimeTracker
+                  task={task}
+                  currentUserId={user.id}
+                  busy={busy}
+                  onStart={() => void act({ action: "start-timer", taskId: task.id }, tr("Chronomètre démarré"))}
+                  onStop={() => void act({ action: "stop-timer", taskId: task.id }, tr("Chronomètre arrêté"))}
+                />
+              </>
             )}
             <h3 className="history-heading">{tr("HISTORIQUE")}</h3>
             <div className="history">
@@ -3385,6 +3496,19 @@ export default function Tracker() {
                 ))}
               </select>
             </label>
+          ) : owner && !workspaces.some((w) => isPrintWorkspaceId(w.id)) ? (
+            <button
+              type="button"
+              className="btn subtle workspace-create-print"
+              disabled={busy}
+              onClick={async () => {
+                await mutate({ action: "create-print-workspace" });
+                navigate({ page: "home" });
+              }}
+            >
+              <Printer size={14} />
+              {tr("Créer l’espace Impression")}
+            </button>
           ) : null}
           <div className="user-row">
             <button
@@ -3666,7 +3790,7 @@ export default function Tracker() {
                       value={form.status || "À faire"}
                       onChange={(v) => set("status", v || "À faire")}
                       items={[
-                        ...new Set([form.status || "À faire", "En cours", "À valider"]),
+                        ...new Set(["À faire", "En cours", "À valider", form.status || "À faire"]),
                       ]}
                     />
                   </label>
