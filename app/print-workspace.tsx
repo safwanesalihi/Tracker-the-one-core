@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Play,
   Pause,
+  Trash2,
 } from "lucide-react";
 import {
   BarChart,
@@ -55,6 +56,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useI18n } from "@/app/locale-provider";
 import TeamPage from "@/app/team";
 import type { RecordItem } from "@/lib/model";
@@ -116,6 +127,7 @@ export default function PrintWorkspace(p: Props) {
       r.transactionDate >= period.from &&
       r.transactionDate <= period.to);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [removingPayment, setRemovingPayment] = useState<RecordItem | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -764,19 +776,33 @@ export default function PrintWorkspace(p: Props) {
                                 {money(r.amountCents || 0)}
                               </td>
                               <td>
-                                <button
-                                  className="btn subtle"
-                                  disabled={disabled}
-                                  aria-label={`${t("Modifier")} ${r.name}`}
-                                  onClick={() =>
-                                    setEditor({
-                                      kind: "print_transaction",
-                                      record: r,
-                                    })
-                                  }
-                                >
-                                  <Pencil size={15} />
-                                </button>
+                                <div className="print-table-actions">
+                                  <button
+                                    className="btn subtle"
+                                    disabled={disabled}
+                                    aria-label={`${t("Modifier")} ${r.name}`}
+                                    onClick={() =>
+                                      setEditor({
+                                        kind: "print_transaction",
+                                        record: r,
+                                      })
+                                    }
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="icon-button danger"
+                                    disabled={disabled}
+                                    aria-label={`${t("Supprimer")} ${r.name}`}
+                                    onClick={() => {
+                                      setError("");
+                                      setRemovingPayment(r);
+                                    }}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1126,6 +1152,46 @@ export default function PrintWorkspace(p: Props) {
           )}
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={!!removingPayment}
+        onOpenChange={(open) => {
+          if (!open && !saving) setRemovingPayment(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Supprimer ce paiement ?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Ce mouvement sera définitivement supprimé et les totaux seront recalculés.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && (
+            <p className="print-alert" role="alert">
+              {error}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>{t("Annuler")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={disabled}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!removingPayment) return;
+                void act({
+                  action: "print-delete-payment",
+                  id: removingPayment.id,
+                  revision: removingPayment.revision,
+                }).then((ok) => {
+                  if (ok) setRemovingPayment(null);
+                });
+              }}
+            >
+              {t(saving ? "Suppression…" : "Supprimer")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </WorkspaceFrame>
   );
 }

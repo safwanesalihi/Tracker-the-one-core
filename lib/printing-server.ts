@@ -13,13 +13,30 @@ export async function mutatePrinting(
   rows: RecordItem[],
 ) {
   const fail = (error: string, status: number) => ({ error, status });
-  if (!["print-save", "print-task-status"].includes(String(body.action)))
+  if (
+    !["print-save", "print-task-status", "print-delete-payment"].includes(
+      String(body.action),
+    )
+  )
     return fail("Action invalide.", 400);
   const manager = isManager(workspace.role);
   const existing = body.id ? rows.find((r) => r.id === body.id) : undefined;
   if (body.id && !existing) return fail("Élément introuvable.", 404);
   if (existing && body.revision !== existing.revision)
     return fail("Cet élément a changé. Actualisez avant de réessayer.", 409);
+  if (body.action === "print-delete-payment") {
+    if (!isManager(workspace.role))
+      return fail("Réservé au propriétaire et aux administrateurs.", 403);
+    if (!existing || existing.kind !== "print_transaction")
+      return fail("Mouvement introuvable.", 404);
+    const deleted = await database().query(
+      "DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND kind = 'print_transaction' AND revision = $3 RETURNING id",
+      [workspace.id, existing.id, body.revision],
+    );
+    if (!deleted.length)
+      return fail("Cet élément a changé. Actualisez avant de réessayer.", 409);
+    return { id: existing.id, status: 200 };
+  }
   const now = new Date().toISOString();
   let item: RecordItem;
   if (body.action === "print-task-status") {

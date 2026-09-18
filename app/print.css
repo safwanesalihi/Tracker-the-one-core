@@ -79,6 +79,11 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.print-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .print-app .btn.subtle {
   background: transparent;
   border-color: transparent;

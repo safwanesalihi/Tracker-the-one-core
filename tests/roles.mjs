@@ -248,6 +248,7 @@ eq(ids(karimView, 'print_transaction'), [], 'operator never receives cash record
 ok(!Object.hasOwn(karimView.records.find(r => r.id === order.id), 'amountCents'), 'operator order payload has no financial amount');
 await get(403, WS);
 await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: cashData }, 403);
+await postTo(PWS, { action: 'print-delete-payment', id: cash.id, revision: 1 }, 403);
 await postTo(PWS, { action: 'print-task-status', id: otherTask.id, revision: 1, status: 'Validé' }, 403);
 await postTo(PWS, { action: 'print-task-status', id: karimTask.id, revision: 1, status: 'Validé' });
 await postTo(PWS, { action: 'print-task-status', id: karimTask.id, revision: 1, status: 'En cours' }, 409);
@@ -268,6 +269,9 @@ ok(!studioAfterPrint.records.some(r => [order.id, cash.id, karimTask.id].include
 const voided = await postTo(PWS, { action: 'print-save', kind: 'print_transaction', id: cash.id, revision: 1, data: { ...cashData, archived: true } });
 ok(voided.records.find(r => r.id === cash.id).archived, 'cash corrections preserve voided records');
 await postTo(PWS, { action: 'print-save', kind: 'print_transaction', id: cash.id, revision: 1, data: cashData }, 409);
+await postTo(PWS, { action: 'print-delete-payment', id: cash.id, revision: 1 }, 409);
+const deletedPayment = await postTo(PWS, { action: 'print-delete-payment', id: cash.id, revision: 2 });
+ok(!deletedPayment.records.some(r => r.id === cash.id), 'the owner can permanently delete a payment record');
 // A dated printing task must never be approved by the studio content cron.
 await db.query("UPDATE records SET data = data || $1::jsonb WHERE id = $2", [JSON.stringify({ status: 'À valider', approvalDueAt: '2020-01-01T00:00:00Z' }), karimTask.id]);
 eq((await get(200, PWS)).records.find(r => r.id === karimTask.id).status, 'À valider', 'printing excludes automatic studio approval clocks');

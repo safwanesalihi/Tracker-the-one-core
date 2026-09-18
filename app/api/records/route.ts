@@ -214,7 +214,7 @@ export async function POST(req: Request) {
 
     if (isPrintWorkspaceId(workspace.id)) {
       if (workspace.role === 'client') return response({ error: 'Accès non autorisé.' }, 403);
-      if (['print-save', 'print-task-status'].includes(body.action)) {
+      if (['print-save', 'print-task-status', 'print-delete-payment'].includes(body.action)) {
         const changed = await mutatePrinting(workspace, owner, actor, body, rowsNow);
         if ('error' in changed) return response({ error: changed.error }, changed.status);
         return result({ id: changed.id });

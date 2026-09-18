@@ -155,6 +155,12 @@ const copy: [string, string, string][] = [
   ["Démarrer", "Start", "تشغيل"],
   ["Arrêter", "Stop", "إيقاف"],
   ["Enregistré", "Saved", "تم الحفظ"],
+  ["Supprimer ce paiement ?", "Delete this payment?", "حذف هذه الدفعة؟"],
+  [
+    "Ce mouvement sera définitivement supprimé et les totaux seront recalculés.",
+    "This transaction will be permanently deleted and totals will be recalculated.",
+    "سيتم حذف هذه الحركة نهائيا وإعادة حساب المجاميع.",
+  ],
   [
     "Indiquez avec qui vous traitez.",
     "Enter the counterparty.",
