@@ -2,6 +2,7 @@
 import { batch, database, type Statement } from '@/lib/database';
 import type { RecordItem } from '@/lib/model';
 import { sweep } from '@/lib/flow';
+import { isPrintWorkspaceId } from '@/lib/workspace';
 
 type RecordRow = { id: string; kind: RecordItem['kind']; data: unknown; revision: number };
 const parse = (data: unknown) => (typeof data === 'string' ? JSON.parse(data) : data) as Partial<RecordItem>;
@@ -46,6 +47,7 @@ export const insertRecord = (record: RecordItem, owner: string, workspaceId: str
  * Returns the number of rows touched. Safe to call on every request: it writes nothing when nothing is due.
  */
 export async function applySweep(workspaceId: string, rows?: RecordItem[], now = new Date()) {
+  if (isPrintWorkspaceId(workspaceId)) return 0;
   const records = rows ?? await loadRecords(workspaceId);
   const { tasks, events } = sweep(records, now);
   if (!tasks.length && !events.length) return 0;

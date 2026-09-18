@@ -3,7 +3,7 @@
 import { createElement, useState } from 'react';
 import { AlertTriangle, Bell, BellOff, CheckCircle2, ChevronRight, Clock, Gauge, Inbox, Lock, RefreshCw, Repeat, Send, Sparkles, Timer, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/app/locale-provider';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DashboardPeriod from '@/app/dashboard-period';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type RecordItem } from '@/lib/model';
 import { computeMetrics, courtOf, dayIn, flow, monthPeriod, shiftDay, type Court, type Metrics } from '@/lib/flow';
@@ -65,7 +65,7 @@ export default function FlowPage({ records, today, busy, onOpenTask, onOpenClien
   const compareData = metrics.clients.filter((c) => c.quota).sort((a, b) => (b.quota ?? 0) - (a.quota ?? 0)).slice(0, 10).map((c) => ({ key: c.clientId, label: c.name, a: c.quota ?? 0, b: c.delivered }));
 
   return <div className="flow-page">
-    <div className="page-heading"><span className="page-symbol" aria-hidden="true"><Gauge size={22} /></span><div className="heading-line"><h1>{t('Tableau de bord')}</h1><div className="inline"><Tabs value={periodKey} onValueChange={setPeriodKey}><TabsList><TabsTrigger value="month">{t('Ce mois')}</TabsTrigger><TabsTrigger value="previous">{t('Mois précédent')}</TabsTrigger><TabsTrigger value="30">{t('30 jours')}</TabsTrigger></TabsList></Tabs><button className="btn" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />{t('Actualiser')}</button></div></div><p>{t('Les six nombres de The One Flow ·')}{' '}{periodLabel}</p></div>
+    <div className="page-heading"><span className="page-symbol" aria-hidden="true"><Gauge size={22} /></span><div className="heading-line"><h1>{t('Tableau de bord')}</h1><div className="inline"><DashboardPeriod value={periodKey} onChange={setPeriodKey}/><button className="btn" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />{t('Actualiser')}</button></div></div><p>{t('Les six nombres de The One Flow ·')}{' '}{periodLabel}</p></div>
 
     <div className="metric-grid flow-tiles">{tiles(metrics, t).map((tile) => <div className={`metric-card flow-tile ${tile.ok === null ? '' : tile.ok ? 'ok' : 'warn'}`} key={tile.label}><div className="metric-label"><span>{tile.label}</span><span className="metric-icon">{createElement(tile.icon, { size: 18 })}</span></div><strong>{tile.value}</strong><small>{tile.detail}</small><span className="flow-target">{t('Cible {target}', { target: tile.target })}</span></div>)}</div>
 

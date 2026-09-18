@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 587.84 137.77">
+  <defs>
+    <style>
+      .cls-1 {
+        font-family: SFPro-Medium, 'SF Pro';
+        font-size: 31.78px;
+        font-variation-settings: 'wdth' 100, 'opsz' 28, 'wght' 510;
+        font-weight: 500;
+      }
+
+      .cls-2 {
+        fill: url(#linear-gradient-2);
+      }
+
+      .cls-3 {
+        fill: url(#linear-gradient);
+      }
+
+      .cls-4 {
+        font-family: 'SFPro_920.080wght_1ital', 'SF Pro';
+        font-size: 51.52px;
+        font-variation-settings: 'wdth' 100, 'opsz' 28, 'wght' 920;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="0" y1="40.53" x2="112.76" y2="40.53" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b28941"/>
+      <stop offset="1" stop-color="#8e6928"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="7.45" y1="90.61" x2="137.94" y2="90.61" xlink:href="#linear-gradient"/>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g id="Generative_Object" data-name="Generative Object">
+        <path class="cls-3" d="M112.11,15.08c-6.88-5.38-14.6-9.57-22.97-12.11-24.07-7.3-50-.9-68.02,16.49C4.51,35.5-2.01,56.84.53,79.69c.08.73.65,1.23,1.17,1.35.42.1,1.51-.17,1.51-.87-.01-7.99,2.01-15.62,6.01-22.58,4.37-7.61,10.98-13.32,19.31-16.59,6.78-2.66,13.27-4.73,20.19-6.62l33.26-9.09,29.7-7.47c.68-.17,1.05-.82,1.08-1.33.03-.43-.15-1.03-.64-1.42Z"/>
+        <path class="cls-2" d="M137.79,64.78c-.47-7.06-1.76-13.86-4.28-20.36-.58-1.49-2.32-.54-3.15.15l-59.93,49.08c1.62-4.88,3.52-8.97,4.25-13.84,1.13-7.51.23-15.24-3.67-21.89-5.09-8.69-14.47-14.01-24.53-14.44-11.17-.48-21.98,3.92-29.36,12.26-11.28,12.75-12.24,31.85-5.25,47.05,8.73,18.99,27.26,31.41,47.78,34.35,26.8,3.84,53.2-10.33,67.78-32.73,7.74-11.89,11.3-25.59,10.36-39.63Z"/>
+      </g>
+      <text class="cls-4" transform="translate(145.95 62.89)"><tspan x="0" y="0">THE ONE PRINT</tspan></text>
+      <text class="cls-1" transform="translate(145.95 104.89)"><tspan x="0" y="0">By The One Core</tspan></text>
+    </g>
+  </g>
+</svg>

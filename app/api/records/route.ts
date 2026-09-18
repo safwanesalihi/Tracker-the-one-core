@@ -15,6 +15,9 @@ import {
 import { applySweep, insertRecord, loadRecords } from '@/lib/flow-server';
 import { isOwnerEmail, provisionAccount } from '@/lib/password-auth';
 import { mailConfigured, sendInvitation } from '@/lib/mail';
+import { isPrintWorkspaceId } from '@/lib/workspace';
+import { printVisible } from '@/lib/printing';
+import { mutatePrinting } from '@/lib/printing-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +33,7 @@ async function identity(req?: Request) {
 
 const workspaceIdFor = (owner: string) => `ws:${owner}`;
 // The print side of the business: a second, independent workspace for the same owner — its own
-// clients/projects/tasks, reached by the existing workspace switcher once it exists. Detecting one
+// cash movements/orders/tasks, reached by the existing workspace switcher once it exists. Detecting one
 // from a bare id (no DB round-trip) lives in lib/workspace.ts as `isPrintWorkspaceId`.
 const printWorkspaceIdFor = (owner: string) => `${workspaceIdFor(owner)}:print`;
 
@@ -125,6 +128,7 @@ const isMine = (user: AppUser, task: RecordItem) =>
   !task.assignee?.trim() || (task.assigneeId ? task.assigneeId === user.userId : identitiesOf(user).some((v) => v.trim().toLowerCase() === task.assignee!.trim().toLowerCase()));
 
 function visibleTo(workspace: WorkspaceContext, rows: RecordItem[], user: AppUser) {
+  if (isPrintWorkspaceId(workspace.id)) return printVisible(workspace, rows, user.userId);
   if (workspace.role === 'client') return portalView(rows, workspace.clientId!);
   if (isMemberRole(workspace.role)) return memberView(rows, identitiesOf(user), user.userId);
   // Devis/factures/contrats are owner + client only — admin and viewer never see that they exist.
@@ -207,6 +211,17 @@ export async function POST(req: Request) {
 
     const rowsNow = await all(workspace.id);
     if (!clientContextValid(workspace, rowsNow)) return response({ error: 'Votre accès client n’est plus actif. Contactez le studio.' }, 403);
+
+    if (isPrintWorkspaceId(workspace.id)) {
+      if (workspace.role === 'client') return response({ error: 'Accès non autorisé.' }, 403);
+      if (['print-save', 'print-task-status'].includes(body.action)) {
+        const changed = await mutatePrinting(workspace, owner, actor, body, rowsNow);
+        if ('error' in changed) return response({ error: changed.error }, changed.status);
+        return result({ id: changed.id });
+      }
+      const shared = ['invite-member', 'renew-invitation', 'set-member-role', 'remove-member', 'update-profile', 'start-timer', 'stop-timer'];
+      if (!shared.includes(body.action)) return response({ error: 'Cette action n’est pas disponible dans Impression.' }, 403);
+    }
 
     const parentArchived = (rows: RecordItem[], task: RecordItem) =>
       !!task.archived || !!rows.find((r) => r.id === task.clientId)?.archived || !!rows.find((r) => r.id === task.projectId)?.archived;

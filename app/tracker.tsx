@@ -45,21 +45,17 @@ import {
   PenLine,
   ChevronDown,
   Building2,
-  Settings2,
   Library,
-  Printer,
   Play,
   Pause,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/app/locale-provider";
-import SettingsDialog from "@/app/settings-dialog";
+import WorkspaceFrame, {
+  type WorkspaceFrameOptions,
+} from "@/app/workspace-frame";
+import PrintWorkspace from "@/app/print-workspace";
 import {
-  Sidebar,
-  SidebarProvider,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
@@ -116,7 +112,6 @@ import DatePicker from "@/app/date-picker";
 import TeamPage from "@/app/team";
 import {
   memberName,
-  roleLabels,
   canManageMembers,
   isManager,
   isMemberRole,
@@ -130,7 +125,11 @@ import {
 } from "@/lib/workspace";
 import Portal from "@/app/portal";
 import FlowPage from "@/app/flow-page";
-import { DonutStat, TrendArea, type Slice } from "@/components/dashboard-charts";
+import {
+  DonutStat,
+  TrendArea,
+  type Slice,
+} from "@/components/dashboard-charts";
 import Annex from "@/app/annex";
 import ClientMark from "@/app/client-mark";
 import ClientImages from "@/app/client-images";
@@ -164,11 +163,23 @@ type Modal = {
   date?: string;
 };
 type Form = Record<string, string>;
-type Mutation = Record<string, unknown> & {data?: Partial<RecordItem>; action?: string; kind?: string};
+type Mutation = Record<string, unknown> & {
+  data?: Partial<RecordItem>;
+  action?: string;
+  kind?: string;
+};
 type ApiPayload = {
-  id?: string; records: RecordItem[]; user: {id:string;name:string;email:string;avatar?:string|null};
-  workspace: WorkspaceContext; members: WorkspaceMember[]; workspaces: WorkspaceSummary[];
-  today?: string; mailConfigured?: boolean; invitation?: Invitation; error?: string; code?: string;
+  id?: string;
+  records: RecordItem[];
+  user: { id: string; name: string; email: string; avatar?: string | null };
+  workspace: WorkspaceContext;
+  members: WorkspaceMember[];
+  workspaces: WorkspaceSummary[];
+  today?: string;
+  mailConfigured?: boolean;
+  invitation?: Invitation;
+  error?: string;
+  code?: string;
 };
 const statusSymbols = ["○", "◐", "●", "✓"];
 const defaultColWidths: Record<string, number> = {
@@ -201,11 +212,22 @@ function timerTotals(
   entries: { userId: string; name: string; start: string; end?: string }[] = [],
   nowMs: number,
 ) {
-  const byUser = new Map<string, { userId: string; name: string; ms: number; running: boolean }>();
+  const byUser = new Map<
+    string,
+    { userId: string; name: string; ms: number; running: boolean }
+  >();
   for (const e of entries) {
-    const ms = Math.max(0, (e.end ? new Date(e.end).getTime() : nowMs) - new Date(e.start).getTime());
+    const ms = Math.max(
+      0,
+      (e.end ? new Date(e.end).getTime() : nowMs) - new Date(e.start).getTime(),
+    );
     const prev = byUser.get(e.userId);
-    byUser.set(e.userId, { userId: e.userId, name: e.name, ms: (prev?.ms || 0) + ms, running: !!prev?.running || !e.end });
+    byUser.set(e.userId, {
+      userId: e.userId,
+      name: e.name,
+      ms: (prev?.ms || 0) + ms,
+      running: !!prev?.running || !e.end,
+    });
   }
   return [...byUser.values()].sort((a, b) => b.ms - a.ms);
 }
@@ -223,13 +245,17 @@ function LiveElapsed({ startedAt }: { startedAt: string }) {
     const id = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  const totalSeconds = Math.floor((nowMs - new Date(startedAt).getTime()) / 1000);
+  const totalSeconds = Math.floor(
+    (nowMs - new Date(startedAt).getTime()) / 1000,
+  );
   const hh = Math.floor(totalSeconds / 3600),
     mm = Math.floor((totalSeconds % 3600) / 60),
     ss = totalSeconds % 60;
   return (
     <>
-      {hh > 0 ? `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${mm}:${String(ss).padStart(2, "0")}`}
+      {hh > 0
+        ? `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`
+        : `${mm}:${String(ss).padStart(2, "0")}`}
     </>
   );
 }
@@ -254,7 +280,9 @@ function TimeTracker({
   }, []);
   const totals = timerTotals(task.timeEntries, nowMs);
   const mine = totals.find((p) => p.userId === currentUserId);
-  const myOpenEntry = task.timeEntries?.find((e) => e.userId === currentUserId && !e.end);
+  const myOpenEntry = task.timeEntries?.find(
+    (e) => e.userId === currentUserId && !e.end,
+  );
   return (
     <div className="time-tracker">
       <button
@@ -264,7 +292,11 @@ function TimeTracker({
         onClick={mine?.running ? onStop : onStart}
       >
         {mine?.running ? <Pause size={14} /> : <Play size={14} />}
-        {mine?.running && myOpenEntry ? <LiveElapsed startedAt={myOpenEntry.start} /> : tr("Démarrer")}
+        {mine?.running && myOpenEntry ? (
+          <LiveElapsed startedAt={myOpenEntry.start} />
+        ) : (
+          tr("Démarrer")
+        )}
       </button>
       {totals.length > 0 && (
         <ul className="time-breakdown">
@@ -272,7 +304,9 @@ function TimeTracker({
             <li key={p.userId}>
               <span>
                 {p.name}
-                {p.running && p.userId !== currentUserId ? ` · ${tr("en cours")}` : ""}
+                {p.running && p.userId !== currentUserId
+                  ? ` · ${tr("en cours")}`
+                  : ""}
               </span>
               <strong>{formatDuration(p.ms)}</strong>
             </li>
@@ -280,7 +314,9 @@ function TimeTracker({
           {totals.length > 1 && (
             <li className="time-total">
               <span>{tr("Total")}</span>
-              <strong>{formatDuration(totals.reduce((sum, p) => sum + p.ms, 0))}</strong>
+              <strong>
+                {formatDuration(totals.reduce((sum, p) => sum + p.ms, 0))}
+              </strong>
             </li>
           )}
         </ul>
@@ -336,7 +372,13 @@ function StatusPick({
       </SelectTrigger>
       <SelectContent position="popper" align="start">
         {(member
-          ? statuses.filter((s) => s === "À faire" || s === "En cours" || s === "À valider" || s === task.status)
+          ? statuses.filter(
+              (s) =>
+                s === "À faire" ||
+                s === "En cours" ||
+                s === "À valider" ||
+                s === task.status,
+            )
           : allowApproval
             ? [...statuses]
             : statuses.filter((s) => s !== "À valider" && s !== "Validé")
@@ -490,40 +532,40 @@ function NavItem({
     </SidebarMenuItem>
   );
 }
-  function Heading({
-    emoji,
-    title,
-    subtitle,
-    action,
-    mark,
-  }: {
-    emoji: string;
-    title: string;
-    subtitle?: string;
-    action?: React.ReactNode;
-    mark?: React.ReactNode;
-  }) {
-    return (
-      <div className="page-heading">
-        {mark ?? (
-          <span className="page-symbol" aria-hidden="true">
-            {emoji === "🗂️" ? (
-              <Users size={22} />
-            ) : emoji === "✅" ? (
-              <CheckSquare size={22} />
-            ) : (
-              <Folder size={22} />
-            )}
-          </span>
-        )}
-        <div className="heading-line">
-          <h1>{title}</h1>
-          {action}
-        </div>
-        {subtitle && <p>{subtitle}</p>}
+function Heading({
+  emoji,
+  title,
+  subtitle,
+  action,
+  mark,
+}: {
+  emoji: string;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  mark?: React.ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      {mark ?? (
+        <span className="page-symbol" aria-hidden="true">
+          {emoji === "🗂️" ? (
+            <Users size={22} />
+          ) : emoji === "✅" ? (
+            <CheckSquare size={22} />
+          ) : (
+            <Folder size={22} />
+          )}
+        </span>
+      )}
+      <div className="heading-line">
+        <h1>{title}</h1>
+        {action}
       </div>
-    );
-  }
+      {subtitle && <p>{subtitle}</p>}
+    </div>
+  );
+}
 
 export default function Tracker() {
   const { t: tr, tag, rtl } = useI18n();
@@ -565,7 +607,6 @@ export default function Tracker() {
     [calendarMode, setCalendarMode] = useState("month"),
     [channel, setChannel] = useState("");
   const [modal, setModal] = useState<Modal | null>(null),
-    [settingsOpen, setSettingsOpen] = useState(false),
     [form, setForm] = useState<Form>({}),
     [formError, setFormError] = useState(""),
     [comment, setComment] = useState(""),
@@ -574,21 +615,29 @@ export default function Tracker() {
   // Column and sidebar widths are a per-browser convenience, remembered locally per person.
   // Starting from the static default (not reading localStorage here) keeps the server and the
   // first client render identical; the stored width is applied client-side just after mount.
-  const [colWidths, setColWidths] = useState<Record<string, number>>(defaultColWidths);
+  const [colWidths, setColWidths] =
+    useState<Record<string, number>>(defaultColWidths);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   // Kanban drag feedback: which card is being dragged, and which column it's currently over.
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null),
     [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("the-one.tableColWidths") || "{}");
+      const saved = JSON.parse(
+        localStorage.getItem("the-one.tableColWidths") || "{}",
+      );
       // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage read after mount
       setColWidths((w) => ({ ...w, ...saved }));
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
     try {
       const saved = Number(localStorage.getItem("the-one.sidebarWidth"));
-      if (saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH) setSidebarWidth(saved);
-    } catch { /* private mode */ }
+      if (saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH)
+        setSidebarWidth(saved);
+    } catch {
+      /* private mode */
+    }
   }, []);
   const startColResize = useCallback(
     (key: string) => (e: React.MouseEvent) => {
@@ -608,7 +657,9 @@ export default function Tracker() {
             "the-one.tableColWidths",
             JSON.stringify({ ...colWidths, [key]: current }),
           );
-        } catch { /* private mode */ }
+        } catch {
+          /* private mode */
+        }
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
@@ -623,7 +674,10 @@ export default function Tracker() {
       let current = startWidth;
       const onMove = (ev: MouseEvent) => {
         const delta = ev.clientX - startX;
-        current = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, startWidth + (rtl ? -delta : delta)));
+        current = Math.min(
+          MAX_SIDEBAR_WIDTH,
+          Math.max(MIN_SIDEBAR_WIDTH, startWidth + (rtl ? -delta : delta)),
+        );
         setSidebarWidth(current);
       };
       const onUp = () => {
@@ -631,7 +685,9 @@ export default function Tracker() {
         window.removeEventListener("mouseup", onUp);
         try {
           localStorage.setItem("the-one.sidebarWidth", String(current));
-        } catch { /* private mode */ }
+        } catch {
+          /* private mode */
+        }
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
@@ -658,7 +714,13 @@ export default function Tracker() {
       const [page, id, tab] = window.location.hash
         .slice(1)
         .split("/")
-        .map((part) => { try { return decodeURIComponent(part); } catch { return ""; } });
+        .map((part) => {
+          try {
+            return decodeURIComponent(part);
+          } catch {
+            return "";
+          }
+        });
       if (page) setRoute({ page, id, tab });
     };
     read();
@@ -680,76 +742,103 @@ export default function Tracker() {
     if (role === "client" && !["portal", "review"].includes(route.page))
       navigate({ page: "portal", id: workspace.clientId || "", tab: "home" });
   }, [workspace, route.page, navigate]);
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    if (!silent) setError("");
-    try {
-      const res = await fetch("/api/records", {
-        headers: workspaceIdRef.current
-          ? { "X-Workspace-Id": workspaceIdRef.current }
-          : {},
-      });
-      const data: ApiPayload = await res.json();
-      if (res.status === 401) {
-        if (silent) return;
-        setAuth(true);
-        setRecords([]);
-        setMembers([]);
-        setWorkspace(null);
-        workspaceIdRef.current = null;
-        return;
-      }
-      if (res.status === 403) {
-        if (silent) return;
-        setRecords([]);
-        setMembers([]);
-        setWorkspace(null);
-        workspaceIdRef.current = null;
-        if (data.code === "no-workspace") {
-          setNoAccess(true);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      if (!silent) setError("");
+      try {
+        if (!workspaceIdRef.current) {
+          try {
+            workspaceIdRef.current =
+              sessionStorage.getItem("the-one.workspace");
+          } catch {
+            /* private mode */
+          }
+        }
+        const res = await fetch("/api/records", {
+          headers: workspaceIdRef.current
+            ? { "X-Workspace-Id": workspaceIdRef.current }
+            : {},
+        });
+        const data: ApiPayload = await res.json();
+        if (res.status === 401) {
+          if (silent) return;
+          setAuth(true);
+          setRecords([]);
+          setMembers([]);
+          setWorkspace(null);
+          workspaceIdRef.current = null;
+          try {
+            sessionStorage.removeItem("the-one.workspace");
+          } catch {
+            /* private mode */
+          }
           return;
         }
-        if (data.code === "password-change-required") {
-          setChangePassword(true);
-          return;
+        if (res.status === 403) {
+          if (silent) return;
+          setRecords([]);
+          setMembers([]);
+          setWorkspace(null);
+          workspaceIdRef.current = null;
+          try {
+            sessionStorage.removeItem("the-one.workspace");
+          } catch {
+            /* private mode */
+          }
+          if (data.code === "no-workspace") {
+            setNoAccess(true);
+            return;
+          }
+          if (data.code === "password-change-required") {
+            setChangePassword(true);
+            return;
+          }
         }
+        if (!res.ok) throw Error(data.error);
+        // Instant-enough alerts: toast any studio event (new client, new assignment…) that showed up
+        // since the last poll, without re-alerting on ones already seen or read.
+        const alerts = data.records.filter(
+          (r) =>
+            r.kind === "event" &&
+            r.audience !== "client" &&
+            !r.read &&
+            (r.type === "client-added" || r.type === "task-assigned"),
+        );
+        const seen = knownAlertIdsRef.current;
+        if (seen) {
+          const fresh = alerts.filter((r) => !seen.has(r.id));
+          if (fresh.length === 1) setNotice(fresh[0].name);
+          else if (fresh.length > 1)
+            setNotice(tr("{n} nouvelles notifications", { n: fresh.length }));
+        }
+        knownAlertIdsRef.current = new Set(alerts.map((r) => r.id));
+        setRecords(data.records);
+        setUser(data.user);
+        setWorkspace(data.workspace);
+        setMembers(data.members);
+        setWorkspaces(data.workspaces || []);
+        if (data.today) setToday(data.today);
+        if (typeof data.mailConfigured === "boolean")
+          setMailConfigured(data.mailConfigured);
+        workspaceIdRef.current = data.workspace.id;
+        try {
+          sessionStorage.setItem("the-one.workspace", data.workspace.id);
+        } catch {
+          /* private mode */
+        }
+        setAuth(false);
+        setNoAccess(false);
+        setChangePassword(false);
+      } catch (e) {
+        if (!silent)
+          setError(e instanceof Error ? e.message : "Chargement impossible.");
+      } finally {
+        if (!silent) setLoading(false);
       }
-      if (!res.ok) throw Error(data.error);
-      // Instant-enough alerts: toast any studio event (new client, new assignment…) that showed up
-      // since the last poll, without re-alerting on ones already seen or read.
-      const alerts = data.records.filter(
-        (r) =>
-          r.kind === "event" &&
-          r.audience !== "client" &&
-          !r.read &&
-          (r.type === "client-added" || r.type === "task-assigned"),
-      );
-      const seen = knownAlertIdsRef.current;
-      if (seen) {
-        const fresh = alerts.filter((r) => !seen.has(r.id));
-        if (fresh.length === 1) setNotice(fresh[0].name);
-        else if (fresh.length > 1)
-          setNotice(tr("{n} nouvelles notifications", { n: fresh.length }));
-      }
-      knownAlertIdsRef.current = new Set(alerts.map((r) => r.id));
-      setRecords(data.records);
-      setUser(data.user);
-      setWorkspace(data.workspace);
-      setMembers(data.members);
-      setWorkspaces(data.workspaces || []);
-      if (data.today) setToday(data.today);
-      if (typeof data.mailConfigured === "boolean")
-        setMailConfigured(data.mailConfigured);
-      workspaceIdRef.current = data.workspace.id;
-      setAuth(false);
-      setNoAccess(false);
-      setChangePassword(false);
-    } catch (e) {
-      if (!silent) setError(e instanceof Error ? e.message : "Chargement impossible.");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [tr]);
+    },
+    [tr],
+  );
   // Initial authenticated fetch synchronizes the UI with the server.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial external data fetch
@@ -807,7 +896,15 @@ export default function Tracker() {
       }
       if (Array.isArray(data.records)) setRecords(data.records);
       if (data.members) setMembers(data.members);
-      if (data.workspace) setWorkspace(data.workspace);
+      if (data.workspace) {
+        setWorkspace(data.workspace);
+        workspaceIdRef.current = data.workspace.id;
+        try {
+          sessionStorage.setItem("the-one.workspace", data.workspace.id);
+        } catch {
+          /* private mode */
+        }
+      }
       if (data.workspaces) setWorkspaces(data.workspaces);
       if (data.today) setToday(data.today);
       return data;
@@ -919,7 +1016,10 @@ export default function Tracker() {
   const clients = records.filter((r) => r.kind === "client"),
     projects = records.filter((r) => r.kind === "project");
   const owner = workspace?.role === "owner";
-  const writable = !!workspace && (["owner", "admin"].includes(workspace.role) || isMemberRole(workspace.role));
+  const writable =
+    !!workspace &&
+    (["owner", "admin"].includes(workspace.role) ||
+      isMemberRole(workspace.role));
   const manager = !!workspace && isManager(workspace.role),
     member = !!workspace && isMemberRole(workspace.role);
   // A member's only edit on a task is the deliverable link; every other field stays locked.
@@ -1004,7 +1104,10 @@ export default function Tracker() {
     record?: RecordItem,
     defaults: { status?: Status; date?: string } = {},
   ) {
-    if (!writable) { setError(tr("Votre rôle est en lecture seule.")); return; }
+    if (!writable) {
+      setError(tr("Votre rôle est en lecture seule."));
+      return;
+    }
     if (type === "client" && !record && !owner) {
       setError(tr("Seul le propriétaire peut ajouter des clients."));
       return;
@@ -1172,7 +1275,16 @@ export default function Tracker() {
     }
   }
   useEffect(() => {
-    const mc = (document as Document & {modelContext?: {registerTool: (tool: unknown, options: {signal: AbortSignal}) => unknown}}).modelContext;
+    const mc = (
+      document as Document & {
+        modelContext?: {
+          registerTool: (
+            tool: unknown,
+            options: { signal: AbortSignal },
+          ) => unknown;
+        };
+      }
+    ).modelContext;
     if (!mc?.registerTool) return;
     const lifecycle = new AbortController();
     const tool = {
@@ -1266,17 +1378,19 @@ export default function Tracker() {
           <Table className="task-table">
             <TableHeader>
               <TableRow>
-                {([
-                  [Type, "Tâche", "task"],
-                  [CheckCircle2, "Statut", "status"],
-                  [Briefcase, "Client", "client"],
-                  [Folder, "Sous-projet", "project"],
-                  [UserRound, "Assigné", "assignee"],
-                  [CalendarDays, "Échéance", "due"],
-                  [LinkIcon, "Livrable", "deliverable"],
-                  [Flag, "Source", "source"],
-                  [Megaphone, "Camp", "channel"],
-                ] as [LucideIcon, string, string][]).map(([Icon, label, key]) => (
+                {(
+                  [
+                    [Type, "Tâche", "task"],
+                    [CheckCircle2, "Statut", "status"],
+                    [Briefcase, "Client", "client"],
+                    [Folder, "Sous-projet", "project"],
+                    [UserRound, "Assigné", "assignee"],
+                    [CalendarDays, "Échéance", "due"],
+                    [LinkIcon, "Livrable", "deliverable"],
+                    [Flag, "Source", "source"],
+                    [Megaphone, "Camp", "channel"],
+                  ] as [LucideIcon, string, string][]
+                ).map(([Icon, label, key]) => (
                   <TableHead
                     key={label}
                     style={{ width: colWidths[key] ?? defaultColWidths[key] }}
@@ -1500,128 +1614,139 @@ export default function Tracker() {
             draggingTask.status !== s &&
             statusReachable;
           return (
-          <section
-            className={`board-column ${dragOverStatus === s ? (dropAllowed ? "drag-over" : "drag-over-blocked") : ""}`}
-            key={s}
-            onDragEnter={(e) => {
-              e.preventDefault();
-              setDragOverStatus(s);
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = dropAllowed ? "move" : "none";
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOverStatus(null);
-              const t = tasks.find(
-                (t) => t.id === e.dataTransfer.getData("text/plain"),
-              );
-              if (t && writable && !busy && !archived(t) && t.status !== s && statusReachable) void update(t, { status: s });
-            }}
-          >
-            <header>
-              <Chip status={s} />
-              <small>{filtered.filter((t) => t.status === s).length}</small>
+            <section
+              className={`board-column ${dragOverStatus === s ? (dropAllowed ? "drag-over" : "drag-over-blocked") : ""}`}
+              key={s}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragOverStatus(s);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = dropAllowed ? "move" : "none";
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node))
+                  setDragOverStatus(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverStatus(null);
+                const t = tasks.find(
+                  (t) => t.id === e.dataTransfer.getData("text/plain"),
+                );
+                if (
+                  t &&
+                  writable &&
+                  !busy &&
+                  !archived(t) &&
+                  t.status !== s &&
+                  statusReachable
+                )
+                  void update(t, { status: s });
+              }}
+            >
+              <header>
+                <Chip status={s} />
+                <small>{filtered.filter((t) => t.status === s).length}</small>
+                {manager && (
+                  <button
+                    aria-label={tr("Créer une tâche {status}", {
+                      status: tr(s),
+                    })}
+                    onClick={() => open("task", undefined, { status: s })}
+                  >
+                    <Plus size={16} />
+                  </button>
+                )}
+              </header>
+              {filtered
+                .filter((t) => t.status === s)
+                .map((t) => (
+                  <article
+                    key={t.id}
+                    className={`board-card ${draggingTaskId === t.id ? "dragging" : ""}`}
+                    draggable={writable && !showArchived && !busy}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", t.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggingTaskId(t.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingTaskId(null);
+                      setDragOverStatus(null);
+                    }}
+                  >
+                    <small>{cname(t.clientId)}</small>
+                    <button
+                      className="board-name"
+                      onClick={() => navigate({ page: "task", id: t.id })}
+                    >
+                      {t.name}
+                    </button>
+                    {link(t) && (
+                      <a
+                        className="file-pill"
+                        href={link(t)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <FileText size={13} />
+                        {tr("Livrable")}
+                        <ArrowUpRight size={12} />
+                      </a>
+                    )}
+                    <footer>
+                      <Avatar name={t.assignee} avatar={avatarOf(t.assignee)} />
+                      <span
+                        className={
+                          t.due && t.due < today && s !== "Validé"
+                            ? "overdue"
+                            : ""
+                        }
+                      >
+                        {dateLabel(t.due)}
+                      </span>
+                      <CourtChip task={t} />
+                      <button
+                        aria-label={tr("Modifier {name}", { name: t.name })}
+                        disabled={!writable || archived(t)}
+                        onClick={() => open("task", t)}
+                      >
+                        <MoreHorizontal size={17} />
+                      </button>
+                    </footer>
+                    {s === "À valider" && (
+                      <small>
+                        <Clock size={11} />{" "}
+                        {tr("Tacite dans {n} h", {
+                          n: Math.max(
+                            0,
+                            Math.round(hoursLeft(t, new Date()) ?? 0),
+                          ),
+                        })}
+                      </small>
+                    )}
+                    {s === "Validé" && t.publishedAt && (
+                      <small>
+                        <CheckCircle2 size={11} />{" "}
+                        {tr("Publié le {date}", {
+                          date: dateLabel(t.publishedAt.slice(0, 10)),
+                        })}
+                      </small>
+                    )}
+                  </article>
+                ))}
               {manager && (
                 <button
-                  aria-label={tr("Créer une tâche {status}", { status: tr(s) })}
+                  className="add-row"
                   onClick={() => open("task", undefined, { status: s })}
                 >
-                  <Plus size={16} />
+                  <Plus size={14} />
+                  {tr("Nouvelle tâche")}
                 </button>
               )}
-            </header>
-            {filtered
-              .filter((t) => t.status === s)
-              .map((t) => (
-                <article
-                  key={t.id}
-                  className={`board-card ${draggingTaskId === t.id ? "dragging" : ""}`}
-                  draggable={writable && !showArchived && !busy}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", t.id);
-                    e.dataTransfer.effectAllowed = "move";
-                    setDraggingTaskId(t.id);
-                  }}
-                  onDragEnd={() => {
-                    setDraggingTaskId(null);
-                    setDragOverStatus(null);
-                  }}
-                >
-                  <small>{cname(t.clientId)}</small>
-                  <button
-                    className="board-name"
-                    onClick={() => navigate({ page: "task", id: t.id })}
-                  >
-                    {t.name}
-                  </button>
-                  {link(t) && (
-                    <a
-                      className="file-pill"
-                      href={link(t)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <FileText size={13} />
-                      {tr("Livrable")}
-                      <ArrowUpRight size={12} />
-                    </a>
-                  )}
-                  <footer>
-                    <Avatar name={t.assignee} avatar={avatarOf(t.assignee)} />
-                    <span
-                      className={
-                        t.due && t.due < today && s !== "Validé"
-                          ? "overdue"
-                          : ""
-                      }
-                    >
-                      {dateLabel(t.due)}
-                    </span>
-                    <CourtChip task={t} />
-                    <button
-                      aria-label={tr("Modifier {name}", { name: t.name })}
-                      disabled={!writable || archived(t)}
-                      onClick={() => open("task", t)}
-                    >
-                      <MoreHorizontal size={17} />
-                    </button>
-                  </footer>
-                  {s === "À valider" && (
-                    <small>
-                      <Clock size={11} />{" "}
-                      {tr("Tacite dans {n} h", {
-                        n: Math.max(
-                          0,
-                          Math.round(hoursLeft(t, new Date()) ?? 0),
-                        ),
-                      })}
-                    </small>
-                  )}
-                  {s === "Validé" && t.publishedAt && (
-                    <small>
-                      <CheckCircle2 size={11} />{" "}
-                      {tr("Publié le {date}", {
-                        date: dateLabel(t.publishedAt.slice(0, 10)),
-                      })}
-                    </small>
-                  )}
-                </article>
-              ))}
-            {manager && (
-              <button
-                className="add-row"
-                onClick={() => open("task", undefined, { status: s })}
-              >
-                <Plus size={14} />
-                {tr("Nouvelle tâche")}
-              </button>
-            )}
-          </section>
+            </section>
           );
         })}
       </div>
@@ -1899,7 +2024,7 @@ export default function Tracker() {
         ) : view === "board" ? (
           Board()
         ) : (
-          renderCalendar({items: filtered})
+          renderCalendar({ items: filtered })
         )}
       </>
     );
@@ -1951,27 +2076,29 @@ export default function Tracker() {
           </div>
         </div>
         <div className="metric-grid">
-          {([
+          {(
             [
-              "Tâches actives",
-              active.length,
-              CheckSquare,
-              "À faire et en cours de livraison",
-            ],
-            [
-              "À valider",
-              reviewTasks.length,
-              Send,
-              "Dans la file de validation",
-            ],
-            ["En retard", late.length, Clock, "À traiter en priorité"],
-            [
-              "Tâches validées",
-              completed.length,
-              CheckCircle2,
-              "Livrables approuvés",
-            ],
-          ] as [string, number, LucideIcon, string][]).map(([label, value, Icon, detail]) => (
+              [
+                "Tâches actives",
+                active.length,
+                CheckSquare,
+                "À faire et en cours de livraison",
+              ],
+              [
+                "À valider",
+                reviewTasks.length,
+                Send,
+                "Dans la file de validation",
+              ],
+              ["En retard", late.length, Clock, "À traiter en priorité"],
+              [
+                "Tâches validées",
+                completed.length,
+                CheckCircle2,
+                "Livrables approuvés",
+              ],
+            ] as [string, number, LucideIcon, string][]
+          ).map(([label, value, Icon, detail]) => (
             <div className="metric-card" key={label}>
               <div className="metric-label">
                 <span>{tr(label)}</span>
@@ -2074,7 +2201,7 @@ export default function Tracker() {
                   <ArrowUpRight size={14} />
                 </button>
               </div>
-              {renderTaskRows({items: mine.slice(0, 6), compact: true})}
+              {renderTaskRows({ items: mine.slice(0, 6), compact: true })}
             </section>
             <section className="review-panel">
               <div className="section-head">
@@ -2176,7 +2303,12 @@ export default function Tracker() {
                     </div>
                   </div>
                   <div className="flow-panel-body">
-                    <TrendArea data={weeklyTrend} color="#3d8763" height={182} xTickFormatter={dateLabel} />
+                    <TrendArea
+                      data={weeklyTrend}
+                      color="#3d8763"
+                      height={182}
+                      xTickFormatter={dateLabel}
+                    />
                   </div>
                 </section>
               </div>
@@ -2493,7 +2625,11 @@ export default function Tracker() {
             )
           }
           action={
-            <button className="btn" disabled={!manager} onClick={() => open("client", client)}>
+            <button
+              className="btn"
+              disabled={!manager}
+              onClick={() => open("client", client)}
+            >
               {tr("Modifier la fiche")}
             </button>
           }
@@ -2512,7 +2648,9 @@ export default function Tracker() {
             <TabsTrigger value="tasks">{tr("Tâches")}</TabsTrigger>
             <TabsTrigger value="editorial">{tr("Plan éditorial")}</TabsTrigger>
             {owner && (
-              <TabsTrigger value="documents">{tr("Devis & factures")}</TabsTrigger>
+              <TabsTrigger value="documents">
+                {tr("Devis & factures")}
+              </TabsTrigger>
             )}
           </TabsList>
         </Tabs>
@@ -2560,7 +2698,11 @@ export default function Tracker() {
                 </button>
               ))}
               {!ps.length && (
-                <button className="btn" disabled={!writable} onClick={() => open("project")}>
+                <button
+                  className="btn"
+                  disabled={!writable}
+                  onClick={() => open("project")}
+                >
                   <Plus size={15} />
                   {tr("Nouveau sous-projet")}
                 </button>
@@ -2652,7 +2794,10 @@ export default function Tracker() {
                   <span className="client-mark">
                     <Folder size={20} />
                   </span>
-                  <button disabled={!writable} onClick={() => open("project", p)}>
+                  <button
+                    disabled={!writable}
+                    onClick={() => open("project", p)}
+                  >
                     <strong>{p.name}</strong>
                     <small>
                       {p.description || tr("Ajouter une description")}
@@ -2731,9 +2876,12 @@ export default function Tracker() {
                 </button>
               )}
             </div>
-            {renderCalendar({editorial: true, items: tasks.filter(
+            {renderCalendar({
+              editorial: true,
+              items: tasks.filter(
                 (t) => t.clientId === client.id && isPublishable(t),
-              )})}
+              ),
+            })}
           </>
         )}
       </>
@@ -2776,7 +2924,9 @@ export default function Tracker() {
           />
           <button
             className="btn"
-            disabled={!writable || busy || !comment.trim() || (!!task && archived(task))}
+            disabled={
+              !writable || busy || !comment.trim() || (!!task && archived(task))
+            }
             aria-label={tr("Envoyer le commentaire")}
           >
             <Send size={16} />
@@ -3141,8 +3291,19 @@ export default function Tracker() {
                       manager
                         ? [...statuses]
                         : member
-                          ? statuses.filter((s) => s === "À faire" || s === "En cours" || s === "À valider" || s === task.status)
-                          : statuses.filter((s) => s !== "Validé" && (s !== "À valider" || task.status === "À valider"))
+                          ? statuses.filter(
+                              (s) =>
+                                s === "À faire" ||
+                                s === "En cours" ||
+                                s === "À valider" ||
+                                s === task.status,
+                            )
+                          : statuses.filter(
+                              (s) =>
+                                s !== "Validé" &&
+                                (s !== "À valider" ||
+                                  task.status === "À valider"),
+                            )
                     }
                   />
                 </dd>
@@ -3182,8 +3343,18 @@ export default function Tracker() {
                   task={task}
                   currentUserId={user.id}
                   busy={busy}
-                  onStart={() => void act({ action: "start-timer", taskId: task.id }, tr("Chronomètre démarré"))}
-                  onStop={() => void act({ action: "stop-timer", taskId: task.id }, tr("Chronomètre arrêté"))}
+                  onStart={() =>
+                    void act(
+                      { action: "start-timer", taskId: task.id },
+                      tr("Chronomètre démarré"),
+                    )
+                  }
+                  onStop={() =>
+                    void act(
+                      { action: "stop-timer", taskId: task.id },
+                      tr("Chronomètre arrêté"),
+                    )
+                  }
                 />
               </>
             )}
@@ -3252,7 +3423,11 @@ export default function Tracker() {
   if (loading && !workspace && !auth && !noAccess && !changePassword) {
     return (
       <div className="boot-screen">
-        <img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" />
+        <img
+          className="auth-logo"
+          src="/the-one-core-logo.svg"
+          alt="The One Core"
+        />
       </div>
     );
   }
@@ -3291,6 +3466,50 @@ export default function Tracker() {
         <div className="auth-flow" />
       </div>
     );
+  const frameOptions: WorkspaceFrameOptions = {
+    workspace,
+    workspaces,
+    user,
+    busy: busy || loading,
+    sidebarWidth,
+    onResizeStart: onSidebarResizeStart,
+    onWidthChange: setSidebarWidth,
+    onSwitch: (id) => void switchWorkspace(id),
+    onCreatePrint: async () => {
+      await mutate({ action: "create-print-workspace" });
+      navigate({ page: "home" });
+    },
+    onProfile: async (changes) => {
+      const data = await mutate({ action: "update-profile", ...changes });
+      if (data.user) setUser(data.user);
+      setNotice(tr("Profil mis à jour"));
+      return data.user;
+    },
+    onLogout: () => void logout(),
+  };
+  if (workspace && isPrintWorkspaceId(workspace.id)) {
+    return (
+      <PrintWorkspace
+        frameOptions={frameOptions}
+        key={workspace.id}
+        records={records}
+        workspace={workspace}
+        workspaces={workspaces}
+        members={members}
+        user={user}
+        busy={busy}
+        loading={loading}
+        error={error}
+        today={today}
+        mailConfigured={mailConfigured}
+        mutate={mutate}
+        onSwitch={switchWorkspace}
+        onRefresh={() => void load()}
+        onMember={changeMember}
+        onLogout={() => void logout()}
+      />
+    );
+  }
   if (workspace?.role === "client") {
     const own = clients.find((c) => c.id === workspace.clientId);
     if (loading || !own)
@@ -3363,20 +3582,10 @@ export default function Tracker() {
       />
     );
   return (
-    <SidebarProvider
-      style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
-    >
-      <Sidebar className="tracker-sidebar" side={rtl ? "right" : "left"}>
-        <SidebarHeader>
-          <div className="brand">
-            <img
-              className="sidebar-logo"
-              src="/the-one-core-logo.svg"
-              alt="The One Core"
-            />
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
+    <WorkspaceFrame
+      {...frameOptions}
+      navigation={
+        <>
           <>
             <SidebarGroup>
               <SidebarMenu>
@@ -3480,69 +3689,9 @@ export default function Tracker() {
               </SidebarMenu>
             </SidebarGroup>
           </>
-        </SidebarContent>
-        <SidebarFooter>
-          {workspaces.length > 1 ? (
-            <label className="workspace-switch">
-              <span>{tr("Espace")}</span>
-              <select
-                value={workspace?.id || ""}
-                onChange={(e) => void switchWorkspace(e.target.value)}
-              >
-                {workspaces.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} · {tr(roleLabels[w.role])}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : owner && !workspaces.some((w) => isPrintWorkspaceId(w.id)) ? (
-            <button
-              type="button"
-              className="btn subtle workspace-create-print"
-              disabled={busy}
-              onClick={async () => {
-                await mutate({ action: "create-print-workspace" });
-                navigate({ page: "home" });
-              }}
-            >
-              <Printer size={14} />
-              {tr("Créer l’espace Impression")}
-            </button>
-          ) : null}
-          <div className="user-row">
-            <button
-              className="user-profile"
-              onClick={() => setSettingsOpen(true)}
-              aria-label={tr("Paramètres")}
-              title={tr("Paramètres")}
-            >
-              <Avatar name={user.name} avatar={user.avatar} />
-              <div>
-                <strong>
-                  {user.name.includes("@")
-                    ? user.name.split("@")[0]
-                    : user.name}
-                </strong>
-                <small>
-                  {workspace
-                    ? `${tr(roleLabels[workspace.role])} · ${workspace.name}`
-                    : tr("Mode démonstration")}
-                </small>
-              </div>
-              <Settings2 size={15} className="user-settings-icon" />
-            </button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-      <div
-        className="sidebar-resize-handle"
-        style={rtl ? { right: sidebarWidth } : { left: sidebarWidth }}
-        onMouseDown={onSidebarResizeStart}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={tr("Redimensionner la barre latérale")}
-      />
+        </>
+      }
+    >
       <main className="workspace">
         <header className="topbar">
           <SidebarTrigger aria-label={tr("Afficher le menu")} />
@@ -3695,23 +3844,6 @@ export default function Tracker() {
           {notice}
         </div>
       )}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        user={user}
-        workspaceId={workspace?.id || null}
-        workspaceName={workspace?.name}
-        onSave={async (changes) => {
-          const data = await mutate({ action: "update-profile", ...changes });
-          if (data.user) setUser(data.user);
-          setNotice(tr("Profil mis à jour"));
-          return data.user;
-        }}
-        onLogout={() => {
-          setSettingsOpen(false);
-          void logout();
-        }}
-      />
       <Dialog
         open={!!modal}
         onOpenChange={(o) => {
@@ -3790,7 +3922,12 @@ export default function Tracker() {
                       value={form.status || "À faire"}
                       onChange={(v) => set("status", v || "À faire")}
                       items={[
-                        ...new Set(["À faire", "En cours", "À valider", form.status || "À faire"]),
+                        ...new Set([
+                          "À faire",
+                          "En cours",
+                          "À valider",
+                          form.status || "À faire",
+                        ]),
                       ]}
                     />
                   </label>
@@ -3852,7 +3989,10 @@ export default function Tracker() {
                               ...members.map(memberName),
                               ...(form.assignee ? [form.assignee] : []),
                             ]),
-                          ].map((value) => ({ value, avatar: avatarOf(value) }))}
+                          ].map((value) => ({
+                            value,
+                            avatar: avatarOf(value),
+                          }))}
                         />
                       </label>
                       <label className="form-field">
@@ -4275,6 +4415,6 @@ export default function Tracker() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+    </WorkspaceFrame>
   );
 }

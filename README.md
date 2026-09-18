@@ -2,6 +2,18 @@
 
 The One Tracker runs **The One Flow** for the studio and its clients, without ClickUp: the four-status workflow, the timed validation clock, the revision budget, the frozen calendar week, the evergreen reserve, a request form, a real client portal (FR / AR, RTL) and the six numbers that tell whether the system works.
 
+## Impression workspace
+
+The owner can create a separate **Impression** workspace from the workspace switcher. Its membership and records are independent from the studio; there is no Clients page or client portal.
+
+- **Cash ledger:** income and expenses in MAD, transaction date, category, customer/supplier name, optional order link, monthly filters, search and CSV export. Corrections can void and restore transactions. Amounts are stored as integer centimes.
+- **Orders:** quantities, delivery date, production status, task progress and payment progress. Customer refunds reduce received payments; supplier expenses do not. Cash totals count actual movements, not order values.
+- **Team tasks:** standalone or order-linked work, stable user assignments, editable status, and per-person timers. Existing printing tasks remain available. Studio approval clocks never run in Impression.
+- **Access:** owner/admin manage finances, orders, tasks and invitations. Printing operators see assigned/unassigned tasks and related orders without financial amounts; they update task status and track time. Studio access requires a separate invitation.
+- **Dashboard:** income, expenses, net cash movement, outstanding order payments, six-month chart, production and team progress. Cash cards follow the selected month; outstanding payments and production span all orders.
+
+Records use the existing workspace-scoped JSONB table; no new database migration is needed. Printing tests are included in `pnpm test`.
+
 ## The One Flow — what the app enforces
 
 Every rule lives in one file, [lib/flow.ts](lib/flow.ts), as pure functions with the constants at the top. The API applies them; the Dashboard page and the contract annex read them. Change a number there and the app, the receipts and the annex agree.

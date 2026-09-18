@@ -12,6 +12,7 @@ import { canManageMembers, invitableRolesFor, memberName, roleDescriptions, role
 import type { RecordItem } from '@/lib/model';
 import { useI18n } from '@/app/locale-provider';
 import { buildInvitePdf, downloadPdf } from '@/lib/invite-pdf';
+import { isPrintWorkspaceId } from '@/lib/workspace';
 
 type Props = {
   workspace: WorkspaceContext | null;
@@ -32,6 +33,11 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
   const [editing, setEditing] = useState<WorkspaceMember | null>(null);
   const [removing, setRemoving] = useState<WorkspaceMember | null>(null);
   const availableRoles = invitableRolesFor(workspace?.id || '');
+  const printing = isPrintWorkspaceId(workspace?.id || '');
+  const displayedRoles = workspaceRoles.filter(value => !printing || !['client', 'creative'].includes(value));
+  const descriptionFor = (role: keyof typeof roleDescriptions) => printing && role === 'admin'
+    ? 'Gère les mouvements, les commandes, les tâches et les accès de l’équipe impression.'
+    : printing && role === 'viewer' ? 'Consulte les tâches disponibles et les commandes liées, sans montants ni modification.' : roleDescriptions[role];
   const [role, setRole] = useState<EditableRole>('viewer');
   const [roleClient, setRoleClient] = useState('');
   const [invite, setInvite] = useState({ email: '', name: '', role: availableRoles[0], clientId: '' });
@@ -72,7 +78,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
     try {
       const result = await onChange({ action: 'invite-member', email: invite.email, name: invite.name, role: invite.role, ...(invite.role === 'client' ? { clientId: invite.clientId } : {}) });
       if (result) { setInvitation(result); setInviteContext({ name: invite.name, role: invite.role }); }
-      setInvite({ email: '', name: '', role: 'creative', clientId: '' });
+      setInvite({ email: '', name: '', role: availableRoles[0], clientId: '' });
     } catch (error) {
       setInviteError(error instanceof Error ? t(error.message) : t('Invitation impossible. Réessayez.'));
     } finally { inFlight.current = false; setSaving(false); }
@@ -154,7 +160,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
       <a className="btn primary" href="/login" target="_top">{t('Se connecter')}</a>
     </Empty> : <>
       <div className="team-summary">
-        {([['MEMBRES', members.length], ['GESTION DES ACCÈS', managers], ...(viewers ? [['LECTURE SEULE', viewers] as const] : []), ['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length], ['EN ATTENTE', members.filter((m) => m.pending).length]] as const).map(([label, value]) =>
+        {([['MEMBRES', members.length], ['GESTION DES ACCÈS', managers], ...(viewers ? [['LECTURE SEULE', viewers] as const] : []), ...(!printing ? [['ACCÈS CLIENT', members.filter((m) => m.role === 'client').length] as const] : []), ['EN ATTENTE', members.filter((m) => m.pending).length]] as const).map(([label, value]) =>
           <div key={label}><span>{t(label)}</span><strong>{value}</strong></div>)}
       </div>
       {allowed && <section className="team-card team-invite" aria-labelledby="team-invite-title">
@@ -168,7 +174,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           {invite.role === 'client' && <label className="form-field"><span>{t('Client')}</span><Select value={invite.clientId || '__none'} disabled={disabled} onValueChange={(value) => setInvite({ ...invite, clientId: value === '__none' ? '' : value })}><SelectTrigger className="pick" aria-label={t('Client de l’invité')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{t('Choisir un client')}</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
           <button className="btn primary" disabled={disabled || (invite.role === 'client' && !invite.clientId)}><UserPlus size={15} />{saving ? t('Envoi…') : mailConfigured ? t('Envoyer l’invitation') : t('Créer l’accès')}</button>
         </form>
-        <p className="team-role-description">{t(roleDescriptions[invite.role])}</p>
+        <p className="team-role-description">{t(descriptionFor(invite.role))}</p>
         {inviteError && <p className="form-error" role="alert">{inviteError}</p>}
         {invitation && <div className={`team-invitation ${invitation.sent ? 'sent' : ''}`} role="status">
           {invitation.existingAccount
@@ -190,7 +196,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
             <label className="search-input"><Search size={15} /><input aria-label={t('Rechercher un membre')} placeholder={t('Nom ou e-mail…')} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger aria-label={t('Filtrer les membres par rôle')} className="pick"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="all">{t('Tous les rôles')}</SelectItem>{workspaceRoles.filter((value) => value !== 'client').map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="all">{t('Tous les rôles')}</SelectItem>{displayedRoles.filter((value) => value !== 'client').map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
@@ -199,7 +205,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           <TableBody>{visibleTeam.map(memberRow)}</TableBody>
         </Table> : <Empty><EmptyHeader><Users size={24} /><EmptyTitle>{members.some((m) => m.role !== 'client') ? 'Aucun résultat' : 'Aucun membre disponible'}</EmptyTitle><EmptyDescription>{members.some((m) => m.role !== 'client') ? 'Essayez un autre nom ou un autre rôle.' : 'Actualisez pour recharger les membres de cet espace.'}</EmptyDescription></EmptyHeader>{members.some((m) => m.role !== 'client') && <button className="btn" onClick={() => { setSearch(''); setFilter('all'); }}>{t('Effacer les filtres')}</button>}</Empty>}
       </section>
-      <section className="team-card" aria-labelledby="team-clients-title">
+      {!printing && <section className="team-card" aria-labelledby="team-clients-title">
         <div className="section-head team-toolbar">
           <div><h2 id="team-clients-title" tabIndex={-1}>{t('Clients')}{' '}<span className="neutral-badge">{visibleClients.length}</span></h2><p>{t('Accès portail, un contact par client.')}</p></div>
         </div>
@@ -207,12 +213,12 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
           <TableHeader><TableRow><TableHead>{t('Membre')}</TableHead><TableHead>{t('Rôle')}</TableHead><TableHead className="team-date">{t('Depuis le')}</TableHead><TableHead className="team-actions-heading">{t('Accès')}</TableHead></TableRow></TableHeader>
           <TableBody>{visibleClients.map(memberRow)}</TableBody>
         </Table> : <Empty><EmptyHeader><Users size={24} /><EmptyTitle>{members.some((m) => m.role === 'client') ? 'Aucun résultat' : 'Aucun accès client'}</EmptyTitle><EmptyDescription>{members.some((m) => m.role === 'client') ? 'Essayez un autre nom.' : 'Invitez un contact client ci-dessus pour lui ouvrir le portail.'}</EmptyDescription></EmptyHeader>{members.some((m) => m.role === 'client') && <button className="btn" onClick={() => setSearch('')}>{t('Effacer la recherche')}</button>}</Empty>}
-      </section>
+      </section>}
       <div className="team-lower">
         <section><h2>{t('Qui peut faire quoi ?')}</h2><p>{t('Les accès sont vérifiés à chaque action.')}</p>
-          <div className="team-permissions">{workspaceRoles.filter((value) => value !== 'viewer' || members.some((m) => m.role === 'viewer')).map((value) => <div key={value}><ShieldCheck size={16} /><div><strong>{t(roleLabels[value])}</strong><p>{t(roleDescriptions[value])}</p></div></div>)}</div>
+          <div className="team-permissions">{displayedRoles.filter((value) => value !== 'viewer' || members.some((m) => m.role === 'viewer')).map((value) => <div key={value}><ShieldCheck size={16} /><div><strong>{t(roleLabels[value])}</strong><p>{t(descriptionFor(value))}</p></div></div>)}</div>
         </section>
-        <section className="team-tip"><span className="onboarding-icon"><Lock size={20} /></span><h3>{t('Un accès à tout l’espace')}</h3><p>{t('Un « Membre » travaille sur les tâches qui lui sont assignées. Un accès « Client » ne voit que le portail de son client : livrables, validation, retours, demandes et calendrier.')}</p><p>{t('Chaque accès est créé ici avec un mot de passe temporaire ; la personne le remplace à sa première connexion. Mot de passe oublié ? « Réinitialiser » lui en envoie un nouveau.')}</p></section>
+        <section className="team-tip"><span className="onboarding-icon"><Lock size={20} /></span><h3>{t(printing ? 'Espace indépendant' : 'Un accès à tout l’espace')}</h3><p>{t(printing ? roleDescriptions.print_operator : 'Un « Membre » travaille sur les tâches qui lui sont assignées. Un accès « Client » ne voit que le portail de son client : livrables, validation, retours, demandes et calendrier.')}</p><p>{t('Chaque accès est créé ici avec un mot de passe temporaire ; la personne le remplace à sa première connexion. Mot de passe oublié ? « Réinitialiser » lui en envoie un nouveau.')}</p></section>
       </div>
     </>}
     <Dialog open={!!editing} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }}>
@@ -221,7 +227,7 @@ export default function TeamPage({ workspace, members, clients = [], currentUser
         <form onSubmit={(event) => { event.preventDefault(); if (editing) void save({ action: 'set-member-role', userId: editing.userId, expectedRole: editing.role, role, ...(role === 'client' ? { clientId: roleClient } : {}) }); }}>
           <label className="form-field"><span>{t('Rôle dans l’espace')}</span><Select value={role} disabled={disabled} onValueChange={(value) => setRole(value as EditableRole)}><SelectTrigger className="pick" aria-label={t('Nouveau rôle')}><SelectValue /></SelectTrigger><SelectContent>{[...availableRoles, ...(editing?.role === 'viewer' ? ['viewer' as const] : [])].map((value) => <SelectItem key={value} value={value}>{t(roleLabels[value])}</SelectItem>)}</SelectContent></Select></label>
           {role === 'client' && <label className="form-field"><span>{t('Client')}</span><Select value={roleClient || '__none'} disabled={disabled} onValueChange={(value) => setRoleClient(value === '__none' ? '' : value)}><SelectTrigger className="pick" aria-label={t('Client')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__none">{t('Choisir un client')}</SelectItem>{activeClients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></label>}
-          <p className="team-role-description">{t(roleDescriptions[role])}</p>
+          <p className="team-role-description">{t(descriptionFor(role))}</p>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}
           <DialogFooter className="modal-footer"><button className="btn" type="button" disabled={saving} onClick={() => setEditing(null)}>{t('Annuler')}</button><button className="btn primary" disabled={disabled || !allowed || (role === editing?.role && roleClient === (editing?.clientId || '')) || (role === 'client' && !roleClient)}>{t(saving ? 'Enregistrement…' : 'Enregistrer le rôle')}</button></DialogFooter>
         </form>

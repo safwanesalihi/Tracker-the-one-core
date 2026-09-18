@@ -4,6 +4,7 @@
 // lib/portal-i18n.ts but follows the same locale.
 import { en } from './en';
 import { ar } from './ar';
+import { printingEn, printingAr } from './printing';
 
 export type Locale = 'fr' | 'en' | 'ar';
 export const locales: Locale[] = ['fr', 'en', 'ar'];
@@ -14,7 +15,7 @@ export const localeMeta: Record<Locale, { label: string; short: string; dir: 'lt
 };
 export const storageKey = 'the-one.locale';
 
-const dictionaries: Record<Locale, Record<string, string>> = { fr: {}, en, ar };
+const dictionaries: Record<Locale, Record<string, string>> = { fr: {}, en: { ...en, ...printingEn }, ar: { ...ar, ...printingAr } };
 
 export const isLocale = (value: unknown): value is Locale => typeof value === 'string' && (locales as string[]).includes(value);
 

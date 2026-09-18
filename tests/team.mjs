@@ -49,4 +49,7 @@ assert.doesNotMatch(disconnected, /ava@example.test|Membres de l’équipe/);
 const maliciousName = render({ ...base, members: [{ ...members[0], name: '<script>alert(1)</script>' }] });
 assert.doesNotMatch(maliciousName, /<script>alert/);
 assert.match(maliciousName, /&lt;script&gt;/);
+const printing = render({ ...base, workspace: { ...base.workspace, id: 'ws:owner:print', name: 'Impression' }, members: members.filter(m => m.role !== 'creative') });
+assert.doesNotMatch(printing, /team-clients-title|ACCÈS CLIENT|Portail client uniquement|Gère les clients existants/);
+assert.match(printing, /Gère les mouvements, les commandes, les tâches/);
 console.log('Team rendering checks passed: actual profiles, role controls, protected owner/self, read-only roles, disconnected state and escaping.');

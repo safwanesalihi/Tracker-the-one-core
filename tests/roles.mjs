@@ -225,14 +225,33 @@ ok(attach.invitation.existingAccount, 'attaching an existing account is flagged,
 const afterAttach = (await db.query('SELECT password_hash FROM users WHERE email = $1', ['yasmine@studio.test']))[0];
 eq(afterAttach.password_hash, beforeAttach.password_hash, 'the existing account’s password is untouched by gaining a second workspace');
 
-const pc1 = await postTo(PWS, { action: 'create', kind: 'client', data: { name: 'Client Impression' } });
-const pp1 = await postTo(PWS, { action: 'create', kind: 'project', data: { name: 'Projet Impression', clientId: pc1.id } });
-const karimTask = await postTo(PWS, { action: 'create', kind: 'task', data: { name: 'Flyer', clientId: pc1.id, projectId: pp1.id, assignee: 'Karim Print', status: 'En cours', due: '2026-12-01' } });
-await postTo(PWS, { action: 'create', kind: 'task', data: { name: 'Carte de visite', clientId: pc1.id, projectId: pp1.id, assignee: 'Yasmine Creative', status: 'En cours', due: '2026-12-01' } });
+await postTo(PWS, { action: 'create', kind: 'client', data: { name: 'Client Impression' } }, 403);
+await postTo(PWS, { action: 'demo' }, 403);
+await postTo(PWS, { action: 'invite-member', email: 'print-client@example.test', role: 'client', clientId: c1.id }, 400);
+const orderData = { name: '500 flyers', counterparty: 'Café Test', amountCents: 150000, quantity: 500, due: '2026-12-01', orderStatus: 'production' };
+const order = await postTo(PWS, { action: 'print-save', kind: 'print_order', data: orderData });
+const cashData = { name: 'Acompte', counterparty: 'Café Test', counterpartyType: 'customer', amountCents: 50000, transactionDate: '2026-09-17', direction: 'in', expenseCategory: 'Paiement', orderId: order.id };
+const cash = await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: cashData });
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: { ...cashData, amountCents: -1 } }, 400);
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: { ...cashData, amountCents: 1.5 } }, 400);
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: { ...cashData, transactionDate: '2026-02-30' } }, 400);
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: { ...cashData, orderId: c1.id } }, 400);
+await postTo(PWS, { action: 'print-save', kind: 'print_order', id: order.id, revision: 0, data: orderData }, 409);
+await postTo(PWS, { action: 'print-save', kind: 'task', data: { name: 'Bad assignee', assigneeId: amine.userId, status: 'À faire' } }, 400);
+const karimTask = await postTo(PWS, { action: 'print-save', kind: 'task', data: { name: 'Flyer', orderId: order.id, assigneeId: karimId, status: 'En cours', due: '2026-12-01' } });
+const otherTask = await postTo(PWS, { action: 'print-save', kind: 'task', data: { name: 'Carte de visite', orderId: order.id, assigneeId: yasmine.userId, status: 'En cours', due: '2026-12-01' } });
 as({ userId: karimId, fullName: 'Karim Print', displayName: 'Karim Print', email: 'karim@studio.test' });
 const karimView = await get(200, PWS);
 eq(karimView.workspace.role, 'print_operator');
 eq(ids(karimView, 'task'), [karimTask.id], 'a print operator only sees their own task in this workspace, mirroring a creative member');
+eq(ids(karimView, 'print_transaction'), [], 'operator never receives cash records');
+ok(!Object.hasOwn(karimView.records.find(r => r.id === order.id), 'amountCents'), 'operator order payload has no financial amount');
+await get(403, WS);
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', data: cashData }, 403);
+await postTo(PWS, { action: 'print-task-status', id: otherTask.id, revision: 1, status: 'Validé' }, 403);
+await postTo(PWS, { action: 'print-task-status', id: karimTask.id, revision: 1, status: 'Validé' });
+await postTo(PWS, { action: 'print-task-status', id: karimTask.id, revision: 1, status: 'En cours' }, 409);
+await postTo(PWS, { action: 'print-task-status', id: karimTask.id, revision: 2, status: 'En cours' });
 
 // Per-person timer: start logs an open entry, a second start on the same task is rejected, stop closes it.
 const started = await postTo(PWS, { action: 'start-timer', taskId: karimTask.id });
@@ -244,6 +263,14 @@ const stopped = await postTo(PWS, { action: 'stop-timer', taskId: karimTask.id }
 ok(stopped.records.find((r) => r.id === karimTask.id).timeEntries[0].end, 'stopping closes the entry');
 await postTo(PWS, { action: 'stop-timer', taskId: karimTask.id }, 409);
 as(owner);
+const studioAfterPrint = await get();
+ok(!studioAfterPrint.records.some(r => [order.id, cash.id, karimTask.id].includes(r.id)), 'printing data stays out of studio');
+const voided = await postTo(PWS, { action: 'print-save', kind: 'print_transaction', id: cash.id, revision: 1, data: { ...cashData, archived: true } });
+ok(voided.records.find(r => r.id === cash.id).archived, 'cash corrections preserve voided records');
+await postTo(PWS, { action: 'print-save', kind: 'print_transaction', id: cash.id, revision: 1, data: cashData }, 409);
+// A dated printing task must never be approved by the studio content cron.
+await db.query("UPDATE records SET data = data || $1::jsonb WHERE id = $2", [JSON.stringify({ status: 'À valider', approvalDueAt: '2020-01-01T00:00:00Z' }), karimTask.id]);
+eq((await get(200, PWS)).records.find(r => r.id === karimTask.id).status, 'À valider', 'printing excludes automatic studio approval clocks');
 
 await pg.close();
 console.log(`${checks} role checks passed: single owner, member scope (clients, own + unassigned tasks, no task creation, read-only team), client portal scope, print workspace + timer.`);
