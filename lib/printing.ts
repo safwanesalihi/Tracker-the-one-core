@@ -74,6 +74,27 @@ export const printSchemas = {
       status: z.enum(["À faire", "En cours", "Validé"]),
     })
     .strict(),
+  print_document: z
+    .object({
+      docType: z.enum(["devis", "facture"]),
+      docStatus: z.string(),
+      counterparty: z.string().trim().min(1, "Indiquez le nom du client.").max(160),
+      number: z.string().max(50).default(""), // We will set this in server or client
+      issuedAt: z.union([date, z.literal("")]).default(""),
+      dueAt: z.union([date, z.literal("")]).default(""),
+      validUntil: z.union([date, z.literal("")]).default(""),
+      taxRate: z.number().nonnegative().max(100).default(0),
+      notes: z.string().max(5000).default(""),
+      lineItems: z.array(
+        z.object({
+          description: z.string().max(300),
+          quantity: z.number().nonnegative().max(1000000),
+          unitPrice: z.number().nonnegative().max(1000000000),
+        })
+      ).max(100),
+      archived: z.boolean().default(false),
+    })
+    .strict(),
 };
 export type PrintKind = keyof typeof printSchemas;
 export function printVisible(
@@ -82,7 +103,7 @@ export function printVisible(
   userId: string,
 ) {
   const printing = rows.filter((r) =>
-    ["task", "print_order", "print_transaction"].includes(r.kind),
+    ["task", "print_order", "print_transaction", "print_document"].includes(r.kind),
   );
   if (isManager(workspace.role)) return printing;
   if (workspace.role === "client") return [];

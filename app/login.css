@@ -1,10 +1,10 @@
-.google-login .google-btn { margin-top: 32px; min-height: 48px; font-size: 14px; color: #1f1f1f; background: #fff; border: 1px solid #747775; border-radius: 4px; }
+.google-login .google-btn { margin-top: 32px; min-height: 48px; font-size: 14px; color: #1f1f1f; background: #fff; border: 1px solid #747775; border-radius: 16px; }
 .google-login .google-btn:disabled { opacity: .55; cursor: not-allowed; }
 .google-login .google-btn img { width: 20px; height: 20px; object-fit: contain; }
 .google-login .google-login-note { font-size: 14px; line-height: 1.7; color: inherit; opacity: .75; margin-top: 17px; }
 .google-login .auth-privacy { align-items: flex-start; line-height: 1.7; font-size: 12px; }
 .google-login .auth-privacy svg { flex-shrink: 0; margin-top: 3px; }
-.auth-setup { width: 100%; background: #fffaed; border: 1px solid #e6d6a4; border-radius: 9px; margin-top: 24px; padding: 17px; color: #64501c; }
+.auth-setup { width: 100%; background: #fffaed; border: 1px solid #e6d6a4; border-radius: 16px; margin-top: 24px; padding: 17px; color: #64501c; }
 .auth-setup strong { font-size: 14px; }
 .auth-setup p { font-size: 14px; line-height: 1.6; margin: 7px 0 13px; color: #756639; }
 .auth-setup .text-link { font-size: 14px; }
@@ -13,11 +13,11 @@
 
 /* E-mail + password form on the dark auth panel */
 .auth-password { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 26px; }
-.auth-mode { display: grid; grid-template-columns: 1fr 1fr; background: #ffffff10; border: 1px solid #ffffff1c; border-radius: 8px; padding: 3px; margin-bottom: 4px; }
-.auth-mode button { min-height: 34px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #b9c1cc; background: transparent; border: 0; }
+.auth-mode { display: grid; grid-template-columns: 1fr 1fr; background: #ffffff10; border: 1px solid #ffffff1c; border-radius: 16px; padding: 3px; margin-bottom: 4px; }
+.auth-mode button { min-height: 34px; border-radius: 16px; font-size: 13px; font-weight: 500; color: #b9c1cc; background: transparent; border: 0; }
 .auth-mode button.active { background: #fff; color: #111; }
 .auth-password label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #a5afbd; }
-.auth-password input { height: 43px; background: #ffffff0d; border: 1px solid #ffffff24; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+.auth-password input { height: 43px; background: #ffffff0d; border: 1px solid #ffffff24; color: #fff; border-radius: 16px; padding: 8px 12px; font-size: 14px; }
 .auth-password input::placeholder { color: #ffffff59; font-size: 13px; }
 .auth-password input:focus { border-color: #E5A93C; background: #ffffff14; }
 .auth-password input:-webkit-autofill { -webkit-text-fill-color: #fff; -webkit-box-shadow: 0 0 0 1000px #262a33 inset; }
@@ -42,7 +42,7 @@
 
 /* Showcase */
 .showcase { display: flex; flex-direction: column; gap: 18px; }
-.showcase-frame { background: #fff; color: #111; border-radius: 14px; box-shadow: 0 30px 60px #0006, 0 0 0 1px #ffffff14; overflow: hidden; animation: showcase-in .45s ease both; }
+.showcase-frame { background: #fff; color: #111; border-radius: 16px; box-shadow: 0 30px 60px #0006, 0 0 0 1px #ffffff14; overflow: hidden; animation: showcase-in .45s ease both; }
 @keyframes showcase-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
 .showcase-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: #f5f6f8; border-bottom: 1px solid #e5e8ee; }
 .showcase-bar span { width: 9px; height: 9px; border-radius: 50%; background: #dfe3ea; }
@@ -81,4 +81,466 @@
   .auth-flow { padding: 32px 22px; }
   .showcase-tiles { grid-template-columns: 1fr; }
   .showcase-gates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
+/* TRUE GLASSMORPHISM OVERRIDES V2 - HIGH CONTRAST & UNIFIED */
+
+
+.workspace {
+    background: transparent !important;
+}
+
+/* Darker Sidebar */
+.tracker-sidebar [data-slot=sidebar-inner], 
+.tracker-sidebar,
+.sidebar {
+    background: rgba(12, 14, 18, 0.95) !important;
+    backdrop-filter: blur(40px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+    border-right: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* Topbar Glass */
+.topbar {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(30px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(200%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Unified Glass Panels */
+.metric-card, .work-panel, .review-panel, .setup-card, .onboarding-card, 
+.client-card, .board-card, .tracker-modal, .database-card, .calendar-wrap, 
+.detail-split, .workflow, .review-layout, .team-card, .portal-card,
+.team-summary > div, .team-lower > section, .client-strip > button,
+.portal-stats, .portal-banner, .portal-empty, .portal-receipt, .deliverable, .sample-document {
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+/* Make tables transparent so the glass container shows through */
+.task-table, .task-table tr, .task-table th, .task-table td, .table-area {
+    background: transparent !important;
+    border-color: rgba(0,0,0,0.05) !important;
+}
+.task-table th {
+    color: #444 !important;
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+.task-table tr:hover td {
+    background: rgba(255,255,255,0.5) !important;
+}
+
+/* Individual list rows (Tasks, Projects, Members) */
+.task-line, .project-row, .member-row, .approval-list > button, .search-results > button {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+    border-radius: 12px !important;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
+}
+.task-line:hover, .project-row:hover, .member-row:hover, .approval-list > button:hover, .search-results > button:hover {
+    background: rgba(255, 255, 255, 0.75) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04) !important;
+    border-color: transparent !important;
+}
+
+/* Kanban Board Columns */
+.board-column {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border: 1px dashed rgba(0,0,0,0.08) !important;
+    border-radius: 16px !important;
+}
+
+/* Calendar */
+.calendar-grid, .calendar-day, .weekdays > span, .calendar-event {
+    background: transparent !important;
+    border-color: rgba(0,0,0,0.05) !important;
+}
+.calendar-day.outside {
+    background: rgba(0,0,0,0.02) !important;
+}
+.calendar-event {
+    background: rgba(255,255,255,0.7) !important;
+    border: 1px solid rgba(255,255,255,0.8) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
+}
+
+/* Vibrant Primary Buttons */
+.btn.primary {
+    background: #EFB849 !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 4px 15px rgba(239, 184, 73, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    color: #111 !important;
+    text-shadow: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+
+/* Inputs & Selects inside glass */
+input, textarea, .pick, .search-input {
+    background: rgba(255,255,255,0.5) !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+}
+input:focus, textarea:focus, .pick:focus-within {
+    background: rgba(255,255,255,0.9) !important;
+    border-color: #EFB849 !important;
+    box-shadow: 0 0 0 3px rgba(239, 184, 73, 0.2) !important;
+}
+
+
+/* UI FIXES & AUDIT CORRECTIONS */
+.search-input {
+    border-radius: 8px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+}
+.search-input input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 8px 0 !important;
+}
+.search-input input:focus {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Fix any buttons inside client strips or rows that might have lost their layout */
+.client-strip > button {
+    border-radius: 0 !important;
+    border-right: 1px solid rgba(0,0,0,0.05) !important;
+    border-bottom: none !important;
+}
+.client-strip > button:last-child {
+    border-right: none !important;
+}
+
+/* Ensure SVG icons inside search inputs align correctly */
+.search-input svg {
+    margin-right: 8px !important;
+    color: #687384 !important;
+}
+
+/* Make sure checkboxes keep their original appearance instead of becoming glass boxes */
+input[type="checkbox"], input[type="radio"] {
+    background: #fff !important;
+    border: 1px solid rgba(0,0,0,0.2) !important;
+}
+input[type="checkbox"]:focus, input[type="radio"]:focus {
+    box-shadow: none !important;
+}
+
+
+/* FULL CONTRAST AUDIT FIXES */
+
+/* 1. Fix the dark metric card (first-child) which lost its dark background but kept white text */
+.metric-card:first-child {
+    background: rgba(15, 18, 25, 0.85) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+.metric-card:first-child .metric-label {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+.metric-card:first-child > small {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+.metric-card:first-child .metric-icon {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #EFB849 !important;
+}
+
+/* 2. Darken all light grays that lack contrast against light glass */
+.metric-label, .metric-card > small, .section-head p, .task-line-name small, 
+.task-line .due, .client-strip small, .client-card p, .client-card footer, 
+.approval-list small, .approval-date, .demo-caption, .setup-step p, 
+.setup-footer, .onboarding-card p, .properties dt, .link-row, 
+.project-row small, .review-card p, .review-card small, .history p, 
+.history small, .deliverable small, .comments > .small-note, .comment small, 
+.comment p, .empty-state [data-slot=empty-description],
+.dashboard-heading p, .page-heading p, .date-tag, .form-field small {
+    color: #475569 !important; /* A darker, legible slate gray */
+}
+
+/* 3. Ensure primary text is fully dark on light glass */
+h1, h2, h3, strong, .task-line-name strong, .table-name, .board-name, 
+.client-strip strong, .project-row strong, .client-card h2, 
+.dashboard-heading h1, .metric-card strong, .auth-form h1, .section-head h2 {
+    color: #0f172a !important; /* Very dark slate, almost black */
+}
+
+/* Allow the dark metric card to keep its white strong text */
+.metric-card:first-child strong {
+    color: #fff !important;
+}
+
+/* 4. Ensure table text has good contrast */
+.task-table td {
+    color: #334155 !important;
+}
+.task-table th {
+    color: #475569 !important;
+}
+
+/* 5. Fix icons that might be too light */
+.metric-icon, .task-line-icon, .approval-icon, .client-mark, .onboarding-icon {
+    color: #334155 !important;
+    border-color: rgba(0,0,0,0.1) !important;
+}
+.metric-card:first-child .metric-icon {
+    color: #EFB849 !important;
+    border-color: transparent !important;
+}
+
+/* 6. General link and action text */
+.text-link, .btn.ghost {
+    color: #334155 !important;
+}
+
+
+
+
+/* AUTH SCREEN LAYOUT */
+.auth-screen {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(400px, 500px) 1fr;
+    background: #000000 !important; 
+}
+.auth-form {
+    background: rgba(12, 14, 18, 0.95) !important; /* Sidebar color */
+    border-right: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 60px 50px !important;
+    height: 100vh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.auth-flow {
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+@media (max-width: 768px) {
+    .auth-screen {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .auth-form {
+        border-right: none !important;
+        border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+        padding: 40px 24px !important;
+        height: auto !important;
+    }
+}
+
+/* ISOLATED LOGIN UI - HIGH CONTRAST DARK LEFT, GRADIENT RIGHT */
+.login-root {
+    min-height: 100vh;
+    display: grid !important;
+    grid-template-columns: minmax(400px, 520px) 1fr !important;
+    background: #000000 !important; 
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    z-index: 99999 !important;
+}
+
+/* LEFT PANE: HIGH CONTRAST DARK (Black/Dark Slate) */
+.login-sidebar {
+    background: #0C0E12 !important;
+    border-right: 1px solid rgba(255,255,255,0.08) !important;
+    padding: 60px 50px !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+}
+.login-sidebar h1 {
+    color: #FFFFFF !important;
+    font-size: 32px !important;
+    margin-top: 24px !important;
+    font-weight: 600 !important;
+}
+.login-sidebar p, .login-sidebar .google-login-note {
+    color: rgba(255,255,255,0.7) !important;
+}
+.login-sidebar label span {
+    color: rgba(255,255,255,0.9) !important;
+    font-weight: 500 !important;
+}
+.login-sidebar input {
+    background: #1A1D24 !important;
+    border: 1px solid #333C4D !important;
+    color: #FFFFFF !important;
+}
+.login-sidebar input:focus {
+    border-color: #EFB849 !important;
+    box-shadow: 0 0 0 3px rgba(239, 184, 73, 0.2) !important;
+    outline: none !important;
+}
+
+/* RIGHT PANE: LIGHT GRADIENT */
+.login-showcase-container {
+    background-color: #f1ebd8 !important;
+    background-image: 
+        radial-gradient(at 0% 0%, hsla(38,100%,74%,1) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(43,100%,74%,1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, hsla(50,100%,74%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, hsla(53,100%,74%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, hsla(28,100%,74%,0.25) 0px, transparent 50%), 
+        radial-gradient(at 80% 100%, hsla(282,100%,75%,0.25) 0px, transparent 50%) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 25px !important;
+}
+
+/* SHOWCASE TEXT & CARD */
+.login-showcase-container .auth-preview h2 {
+    color: #111111 !important;
+}
+.login-showcase-container .auth-preview p {
+    color: #444444 !important;
+}
+.auth-preview-card {
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid #FFFFFF !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.05) !important;
+    color: #111111 !important;
+    border-radius: 16px !important;
+}
+.auth-preview-card h3 {
+    color: #111111 !important;
+}
+.auth-preview-card p {
+    color: #444444 !important;
+}
+.showcase-frame {
+    background: #FFFFFF !important;
+    color: #111111 !important;
+}
+.showcase-copy h3 {
+    color: #111111 !important;
+}
+
+/* FOR BUTTON AND ERROR */
+.login-sidebar .form-error {
+    border: 1px solid rgba(229, 83, 83, 0.4) !important;
+    color: #ff8a8a !important;
+    background: rgba(229, 83, 83, 0.1) !important;
+    padding: 12px 14px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+}
+.login-sidebar .btn.primary {
+    background: #EFB849 !important;
+    color: #111111 !important;
+    border: 1px solid #D9A036 !important;
+    box-shadow: 0 2px 4px rgba(229,169,60,0.3) !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 14px !important;
+    margin-top: 10px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+.login-sidebar .btn.primary:hover {
+    background: #E5A93C !important;
+}
+
+@media (max-width: 768px) {
+    .login-root {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-y: auto !important;
+    }
+    .login-sidebar {
+        border-right: none !important;
+        border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+        padding: 40px 24px !important;
+        height: auto !important;
+        min-height: 100vh !important;
+    }
+}
+
+
+/* --- BULLETPROOF AUTOFILL FIX --- */
+/* We must separate every pseudo-class into its own block so browsers don't drop the whole rule if one is unsupported */
+
+.login-sidebar input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    background-color: #1A1D24 !important;
+    color: #FFFFFF !important;
+}
+
+.login-sidebar input:-webkit-autofill:hover {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+.login-sidebar input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+.login-sidebar input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+.login-sidebar input:-internal-autofill-selected {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    background-color: #1A1D24 !important;
+    color: #FFFFFF !important;
+}
+
+.login-sidebar input:-internal-autofill-previewed {
+    -webkit-box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    background-color: #1A1D24 !important;
+    color: #FFFFFF !important;
+}
+
+.login-sidebar input:autofill {
+    box-shadow: 0 0 0 5000px #1A1D24 inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    background-color: #1A1D24 !important;
+    color: #FFFFFF !important;
+}
+
+/* Ensure focus doesn't accidentally trigger a light background */
+.login-sidebar input:focus {
+    background: #1A1D24 !important;
+}
+
+.login-sidebar p, .login-sidebar .google-login-note {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+.login-sidebar input::placeholder {
+    color: rgba(255, 255, 255, 0.4) !important;
+    font-size: 13px !important;
 }

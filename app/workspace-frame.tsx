@@ -64,7 +64,7 @@ export default function WorkspaceFrame({
             <Image
               className="sidebar-logo"
               src={
-                printing ? "/the-one-print-logo.svg" : "/the-one-core-logo.svg"
+                printing ? "/the-one-print-logo-new.png" : "/the-one-core-logo.svg"
               }
               alt={
                 printing ? "The One Print — By The One Core" : "The One Core"

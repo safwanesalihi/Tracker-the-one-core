@@ -81,6 +81,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import {
+  Tooltip,
   Table,
   TableHeader,
   TableBody,
@@ -157,6 +158,7 @@ type Modal = {
     | "archive"
     | "feedback"
     | "approve"
+    | "editorial_post"
     | "delete";
   record?: RecordItem;
   status?: Status;
@@ -285,26 +287,15 @@ function TimeTracker({
   );
   return (
     <div className="time-tracker">
-      <button
-        type="button"
-        className={`btn ${mine?.running ? "" : "primary"}`}
-        disabled={busy}
-        onClick={mine?.running ? onStop : onStart}
-      >
-        {mine?.running ? <Pause size={14} /> : <Play size={14} />}
-        {mine?.running && myOpenEntry ? (
-          <LiveElapsed startedAt={myOpenEntry.start} />
-        ) : (
-          tr("Démarrer")
-        )}
-      </button>
-      {totals.length > 0 && (
+      {totals.length > 0 ? (
         <ul className="time-breakdown">
           {totals.map((p) => (
             <li key={p.userId}>
               <span>
                 {p.name}
                 {p.running && p.userId !== currentUserId
+                  ? ` · ${tr("en cours")}`
+                  : p.running && p.userId === currentUserId
                   ? ` · ${tr("en cours")}`
                   : ""}
               </span>
@@ -320,6 +311,8 @@ function TimeTracker({
             </li>
           )}
         </ul>
+      ) : (
+        <p className="empty-state">{tr("Aucun temps enregistré pour cette tâche.")}</p>
       )}
     </div>
   );
@@ -437,6 +430,7 @@ function Pick({
       </SelectContent>
     </Select>
   );
+
 }
 function AssigneePick({
   value,
@@ -606,6 +600,7 @@ export default function Tracker() {
     ),
     [calendarMode, setCalendarMode] = useState("month"),
     [channel, setChannel] = useState("");
+  const [inlineTask, setInlineTask] = useState<Partial<RecordItem> & { view?: string } | null>(null);
   const [modal, setModal] = useState<Modal | null>(null),
     [form, setForm] = useState<Form>({}),
     [formError, setFormError] = useState(""),
@@ -849,7 +844,7 @@ export default function Tracker() {
     const id = setInterval(() => {
       if (document.visibilityState === "visible" && workspaceIdRef.current)
         void load(true);
-    }, 15000);
+    }, 2000);
     return () => clearInterval(id);
   }, [load]);
   useEffect(() => {
@@ -997,6 +992,15 @@ export default function Tracker() {
         data: { ...clean(r), ...changes },
       });
       setNotice(message);
+
+      if (changes.status && changes.status !== r.status) {
+        if (changes.status === "En cours") {
+          await act({ action: "start-timer", taskId: r.id }, tr("Chronomètre démarré"));
+        } else if (r.status === "En cours") {
+          await act({ action: "stop-timer", taskId: r.id }, tr("Chronomètre arrêté"));
+        }
+      }
+
       return true;
     } catch (e) {
       setError(tr((e as Error).message));
@@ -1048,7 +1052,7 @@ export default function Tracker() {
   const reviewTasks = tasks.filter((t) => t.status === "À valider"),
     late = tasks.filter((t) => t.due && t.due < today && t.status !== "Validé");
   const cname = (id?: string) =>
-    clients.find((c) => c.id === id)?.name || tr("Client");
+    id === "internal" ? "Agence" : clients.find((c) => c.id === id)?.name || tr("Client");
   const avatarOf = (name?: string) =>
     name
       ? members.find((m) => memberName(m) === name || m.email === name)?.avatar
@@ -1081,6 +1085,10 @@ export default function Tracker() {
     );
     if (route.page === "client")
       list = list.filter((t) => t.clientId === route.id);
+    if (route.page === "internal")
+      list = list.filter((t) => t.clientId === "internal");
+    if (route.page === "tasks")
+      list = list.filter((t) => t.clientId !== "internal");
     if (statusFilter) list = list.filter((t) => t.status === statusFilter);
     if (assigneeFilter)
       list = list.filter((t) => t.assignee === assigneeFilter);
@@ -1126,6 +1134,12 @@ export default function Tracker() {
       );
       return;
     }
+    if (type === "editorial_post" && !record && (!workspace || !manager)) {
+      setError(
+        tr("Les posts sont créés par le propriétaire ou un administrateur."),
+      );
+      return;
+    }
     setModal({ type, record, ...defaults });
     setFormError("");
     setForm(
@@ -1140,8 +1154,7 @@ export default function Tracker() {
             publishable: record.publishable === false ? "false" : "",
           } as Form)
         : (() => {
-            const clientId =
-              client?.id || clients.find((c) => !c.archived)?.id || "";
+            const clientId = route.page === "internal" ? "internal" : (client?.id || clients.find((c) => !c.archived)?.id || "");
             return {
               clientId,
               projectId:
@@ -1149,7 +1162,7 @@ export default function Tracker() {
                   ?.id || "",
               name: "",
               status: defaults.status || "À faire",
-              source: "Interne",
+              source: "",
               due: defaults.date || shiftDay(today, flow.lockDays + 1),
               assignee: "",
               description: "",
@@ -1170,6 +1183,36 @@ export default function Tracker() {
           }
         : {}),
     }));
+    async function submitInlineTask() {
+    if (!inlineTask || !inlineTask.name?.trim()) {
+      setInlineTask(null);
+      return;
+    }
+    setBusy(true);
+    try {
+      const data: Record<string, unknown> = {
+        name: inlineTask.name.trim(),
+        clientId: inlineTask.clientId || "internal",
+        projectId: inlineTask.projectId || "",
+        status: inlineTask.status || "To Do",
+        assignee: inlineTask.assignee || "",
+        due: inlineTask.due || "",
+        evergreen: false,
+        publishable: true,
+      };
+      const result = await save({ action: "create", kind: "task", data });
+      setInlineTask(null);
+      setNotice(tr("Tâche ajoutée"));
+      // Navigate to the new task so the user can fill in more details if needed
+      if (result?.id) navigate({ page: "task", id: result.id });
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!modal) return;
@@ -1251,6 +1294,7 @@ export default function Tracker() {
       );
       if (modal.type === "client") navigate({ page: "client", id: result.id });
       if (modal.type === "task") navigate({ page: "task", id: result.id });
+      if (modal.type === "editorial_post") setModal(null);
     } catch (e) {
       setFormError(tr((e as Error).message));
     }
@@ -1389,23 +1433,14 @@ export default function Tracker() {
                     [LinkIcon, "Livrable", "deliverable"],
                     [Flag, "Source", "source"],
                     [Megaphone, "Camp", "channel"],
+                    ...(owner || manager ? [[Clock, "Temps", "time"] as [LucideIcon, string, string]] : []),
                   ] as [LucideIcon, string, string][]
                 ).map(([Icon, label, key]) => (
-                  <TableHead
-                    key={label}
-                    style={{ width: colWidths[key] ?? defaultColWidths[key] }}
-                  >
+                  <TableHead key={label}>
                     <span>
                       <Icon size={14} />
                       {tr(label)}
                     </span>
-                    <span
-                      className="col-resize-handle"
-                      onMouseDown={startColResize(key)}
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={tr("Redimensionner la colonne")}
-                    />
                   </TableHead>
                 ))}
                 <TableHead
@@ -1542,6 +1577,14 @@ export default function Tracker() {
                       )}
                     </span>
                   </TableCell>
+                  {(owner || manager) && (
+                    <TableCell>
+                      {(() => {
+                        const sum = timerTotals(t.timeEntries, Date.now()).reduce((acc, p) => acc + p.ms, 0);
+                        return sum > 0 ? formatDuration(sum) : "—";
+                      })()}
+                    </TableCell>
+                  )}
                   <TableCell className="actions-cell">
                     <span className="row-actions">
                       <button
@@ -1565,7 +1608,57 @@ export default function Tracker() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
+            
+              {inlineTask?.view === "table" && (
+                <TableRow className="inline-add-row">
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        autoFocus 
+                        className="inline-input w-full" 
+                        placeholder={tr("Nom de la tâche...")} 
+                        value={inlineTask.name || ''} 
+                        onChange={e => setInlineTask({ ...inlineTask, name: e.target.value })} 
+                        onKeyDown={e => e.key === 'Enter' && submitInlineTask()}
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <StatusPick 
+                      allowApproval={manager} 
+                      member={member} 
+                      task={inlineTask as any} 
+                      onChange={s => setInlineTask({...inlineTask, status: s})} 
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2 items-center text-xs">
+                       <select className="inline-input" value={inlineTask.clientId || "internal"} onChange={e => setInlineTask({...inlineTask, clientId: e.target.value})}>
+                          <option value="internal">Interne</option>
+                          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                       </select>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <input className="inline-input" placeholder="Projet" value={inlineTask.projectId || ''} onChange={e => setInlineTask({...inlineTask, projectId: e.target.value})} />
+                  </TableCell>
+                  <TableCell>
+                     <select className="inline-input" value={inlineTask.assignee || ""} onChange={e => setInlineTask({...inlineTask, assignee: e.target.value})}>
+                        <option value="">Non assigné</option>
+                        {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                     </select>
+                  </TableCell>
+                  <TableCell>
+                    <input type="date" className="inline-input" value={inlineTask.due || ''} onChange={e => setInlineTask({...inlineTask, due: e.target.value})} />
+                  </TableCell>
+                  <TableCell colSpan={4}>
+                    <button className="btn primary !p-1 !h-7" onClick={submitInlineTask}><Check size={14}/> {tr("Valider")}</button>
+                    <button className="btn ghost !p-1 !h-7 ml-2" onClick={() => setInlineTask(null)}><X size={14}/></button>
+                  </TableCell>
+                </TableRow>
+              )}
+</TableBody>
           </Table>
         </div>
         {!items.length && (
@@ -1582,7 +1675,7 @@ export default function Tracker() {
           <button
             className="add-row"
             disabled={busy}
-            onClick={() => open("task")}
+            onClick={() => setInlineTask({ view: "table", status: statusFilter || "To Do", clientId: "internal" })}
           >
             <Plus size={15} />
             {tr("Nouvelle tâche")}
@@ -1654,7 +1747,7 @@ export default function Tracker() {
                     aria-label={tr("Créer une tâche {status}", {
                       status: tr(s),
                     })}
-                    onClick={() => open("task", undefined, { status: s })}
+                    onClick={() => setInlineTask({ view: "board", status: s, clientId: "internal" })}
                   >
                     <Plus size={16} />
                   </button>
@@ -1738,13 +1831,39 @@ export default function Tracker() {
                   </article>
                 ))}
               {manager && (
-                <button
-                  className="add-row"
-                  onClick={() => open("task", undefined, { status: s })}
-                >
-                  <Plus size={14} />
-                  {tr("Nouvelle tâche")}
-                </button>
+                <>
+                  {inlineTask?.view === "board" && inlineTask?.status === s && (
+                    <div className="board-inline-add">
+                      <input
+                        autoFocus
+                        type="text"
+                        className="inline-input w-full"
+                        placeholder={tr("Nom de la tâche...")}
+                        value={inlineTask.name || ""}
+                        onChange={(e) => setInlineTask({ ...inlineTask, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void submitInlineTask();
+                          if (e.key === "Escape") setInlineTask(null);
+                        }}
+                      />
+                      <div className="board-inline-actions">
+                        <button className="btn primary" onClick={() => void submitInlineTask()}>
+                          <Check size={13} /> {tr("Ajouter")}
+                        </button>
+                        <button className="icon-button" onClick={() => setInlineTask(null)}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    className="add-row"
+                    onClick={() => setInlineTask({ view: "board", status: s, clientId: "internal" })}
+                  >
+                    <Plus size={14} />
+                    {tr("Nouvelle tâche")}
+                  </button>
+                </>
               )}
             </section>
           );
@@ -1856,7 +1975,6 @@ export default function Tracker() {
               const events = items.filter(
                 (t) =>
                   t.due === key &&
-                  (!editorial || isPublishable(t)) &&
                   (!channel || t.channel === channel),
               );
               return (
@@ -1873,7 +1991,7 @@ export default function Tracker() {
                         aria-label={tr("Créer une tâche le {day}", {
                           day: key,
                         })}
-                        onClick={() => open("task", undefined, { date: key })}
+                        onClick={() => setInlineTask({ view: "calendar", due: key, status: "To Do", clientId: "internal" })}
                       >
                         <Plus size={13} />
                       </button>
@@ -1899,6 +2017,30 @@ export default function Tracker() {
                       <Chip status={t.status} />
                     </button>
                   ))}
+                  {inlineTask?.view === "calendar" && inlineTask?.due === key && (
+                    <div className="calendar-inline-add">
+                      <input
+                        autoFocus
+                        type="text"
+                        className="inline-input w-full"
+                        placeholder={tr("Nom de la tâche...")}
+                        value={inlineTask.name || ""}
+                        onChange={(e) => setInlineTask({ ...inlineTask, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void submitInlineTask();
+                          if (e.key === "Escape") setInlineTask(null);
+                        }}
+                      />
+                      <div className="board-inline-actions">
+                        <button className="btn primary" style={{fontSize:11, padding:"2px 6px"}} onClick={() => void submitInlineTask()}>
+                          <Check size={11} /> {tr("OK")}
+                        </button>
+                        <button className="icon-button" onClick={() => setInlineTask(null)}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1978,6 +2120,7 @@ export default function Tracker() {
               value={statusFilter}
               onChange={setStatusFilter}
               items={[...statuses]}
+              emptyLabel={tr("Tous")}
             />
             <span>{tr("Assigné")}</span>
             <Pick
@@ -1985,6 +2128,7 @@ export default function Tracker() {
               value={assigneeFilter}
               onChange={setAssigneeFilter}
               items={assigneeOptions}
+              emptyLabel={tr("Tous")}
             />
             <span>{tr("Camp")}</span>
             <Pick
@@ -1996,6 +2140,7 @@ export default function Tracker() {
                 { value: "client", label: tr("Client") },
                 { value: "done", label: tr("Terminé") },
               ]}
+              emptyLabel={tr("Tous")}
             />
             <button
               className="btn ghost"
@@ -2024,7 +2169,7 @@ export default function Tracker() {
         ) : view === "board" ? (
           Board()
         ) : (
-          renderCalendar({ items: filtered })
+          renderCalendar({ items: records.filter((r) => r.kind === "editorial_post" && !archived(r)) })
         )}
       </>
     );
@@ -2870,16 +3015,16 @@ export default function Tracker() {
             <div className="section-head">
               <h2>{tr("Plan éditorial")}</h2>
               {manager && (
-                <button className="btn primary" onClick={() => open("task")}>
+                <button className="btn primary" onClick={() => open("editorial_post")}>
                   <Plus size={16} />
-                  {tr("Nouveau contenu")}
+                  {tr("Nouveau post")}
                 </button>
               )}
             </div>
             {renderCalendar({
               editorial: true,
-              items: tasks.filter(
-                (t) => t.clientId === client.id && isPublishable(t),
+              items: records.filter(
+                (t) => t.kind === "editorial_post" && t.clientId === client.id && !archived(t)
               ),
             })}
           </>
@@ -3336,7 +3481,7 @@ export default function Tracker() {
                 </div>
               </div>
             )}
-            {writable && (
+            {(owner || manager) && writable && (
               <>
                 <h3>{tr("TEMPS")}</h3>
                 <TimeTracker
@@ -3614,10 +3759,17 @@ export default function Tracker() {
                   onClick={() => navigate({ page: "home" })}
                 />
                 <NavItem
+                  icon={Briefcase}
+                  label={tr("Tâches internes")}
+                  active={route.page === "internal"}
+                  badge={tasks.filter((t) => t.clientId === "internal" && t.status !== "Validé").length}
+                  onClick={() => navigate({ page: "internal" })}
+                />
+                <NavItem
                   icon={CheckSquare}
                   label={tr("Tâches")}
                   active={route.page === "tasks" || route.page === "task"}
-                  badge={tasks.filter((t) => t.status !== "Validé").length}
+                  badge={tasks.filter((t) => t.clientId !== "internal" && t.status !== "Validé").length}
                   onClick={() => navigate({ page: "tasks" })}
                 />
                 <NavItem
@@ -3755,14 +3907,12 @@ export default function Tracker() {
             </div>
           ) : route.page === "home" ? (
             HomePage()
-          ) : route.page === "tasks" ? (
+          ) : route.page === "tasks" || route.page === "internal" ? (
             <>
               <Heading
-                emoji="✅"
-                title={tr("Tâches")}
-                subtitle={tr(
-                  "Organisez les priorités. Faites avancer chaque projet.",
-                )}
+                emoji={route.page === "internal" ? "🏢" : "✅"}
+                title={route.page === "internal" ? tr("Tâches internes") : tr("Tâches")}
+                subtitle={route.page === "internal" ? tr("Gérez les tâches internes de l'agence.") : tr("Organisez les priorités. Faites avancer chaque projet.")}
               />
               {TaskDatabase()}
             </>
@@ -3947,7 +4097,29 @@ export default function Tracker() {
                     />
                   </label>
                 )}
-                {modal?.type !== "client" && !memberTaskOnly && (
+                {modal?.type === "editorial_post" && (
+                  <div className="form-pair">
+                    <label className="form-field">
+                      <span>{tr("Canal (Optionnel)")}</span>
+                      <Pick
+                        label={tr("Canal")}
+                        emptyLabel={tr("Aucun canal")}
+                        value={form.channel || ""}
+                        onChange={(v) => set("channel", v)}
+                        items={channels}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>{tr("Date de publication")}</span>
+                      <DatePicker
+                        label={tr("Date")}
+                        value={form.due || ""}
+                        onChange={(value) => set("due", value)}
+                      />
+                    </label>
+                  </div>
+                )}
+                {modal?.type !== "client" && !memberTaskOnly && form.clientId !== "internal" && (
                   <label className="form-field">
                     <span>{tr("Client *")}</span>
                     <Pick
@@ -3960,22 +4132,24 @@ export default function Tracker() {
                     />
                   </label>
                 )}
+                {modal?.type === "task" && !memberTaskOnly && form.clientId !== "internal" && (
+                  <label className="form-field">
+                    <span>{tr("Sous-projet")}</span>
+                    <Pick
+                      label={tr("Sous-projet")}
+                      emptyLabel={tr("Aucun sous-projet")}
+                      value={form.projectId || ""}
+                      onChange={(v) => set("projectId", v)}
+                      items={projects
+                        .filter(
+                          (p) => p.clientId === form.clientId && !p.archived,
+                        )
+                        .map((p) => ({ value: p.id, label: p.name }))}
+                    />
+                  </label>
+                )}
                 {modal?.type === "task" && !memberTaskOnly && (
                   <>
-                    <label className="form-field">
-                      <span>{tr("Sous-projet")}</span>
-                      <Pick
-                        label={tr("Sous-projet")}
-                        emptyLabel={tr("Aucun sous-projet")}
-                        value={form.projectId || ""}
-                        onChange={(v) => set("projectId", v)}
-                        items={projects
-                          .filter(
-                            (p) => p.clientId === form.clientId && !p.archived,
-                          )
-                          .map((p) => ({ value: p.id, label: p.name }))}
-                      />
-                    </label>
                     <div className="form-pair">
                       <label className="form-field">
                         <span>{tr("Assigné")}</span>
@@ -4206,37 +4380,7 @@ export default function Tracker() {
                     />
                   </label>
                 )}
-                {modal?.type === "task" && !memberTaskOnly && (
-                  <details>
-                    <summary>
-                      {tr("Publication sur les réseaux sociaux")}
-                    </summary>
-                    <div className="form-pair">
-                      <label className="form-field">
-                        <span>{tr("Canal")}</span>
-                        <Pick
-                          label={tr("Canal de publication")}
-                          value={form.channel || ""}
-                          onChange={(v) => set("channel", v)}
-                          items={[...channels]}
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>{tr("Heure")}</span>
-                        <input
-                          type="time"
-                          value={form.time || ""}
-                          onChange={(e) => set("time", e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <small>
-                      {tr(
-                        "L’échéance sert de date de publication. Aucune publication automatique.",
-                      )}
-                    </small>
-                  </details>
-                )}
+
               </div>
             )}
             {formError && (

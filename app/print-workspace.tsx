@@ -1,4 +1,5 @@
 "use client";
+import { FactureEditor } from "./FactureEditor";
 
 import { useState, type FormEvent } from "react";
 import WorkspaceFrame, {
@@ -22,6 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Archive,
+  FileSignature,
+  Loader2,
   Printer,
   LayoutDashboard,
   ArrowLeftRight,
@@ -85,6 +89,9 @@ import {
   printOrderLabels,
   type PrintKind,
 } from "@/lib/printing";
+import { buildDocumentPdf, downloadPdf } from "@/lib/document-pdf";
+import { computeTotals, docLabels, docStatusesFor, docStatusLabels } from "@/lib/documents";
+import type { DocStatus, DocType, LineItem } from "@/lib/model";
 
 type Props = {
   frameOptions: WorkspaceFrameOptions;
@@ -104,13 +111,40 @@ type Props = {
   onMember: (change: MemberChange) => Promise<Invitation | void>;
   onLogout: () => void;
 };
-type Page = "dashboard" | "transactions" | "orders" | "tasks" | "team";
+type Page = "dashboard" | "transactions" | "orders" | "factures" | "tasks" | "team";
 type Editor = {
   kind: PrintKind;
   record?: RecordItem;
   direction?: "in" | "out";
   orderId?: string;
 };
+
+type Draft = {
+  id?: string;
+  revision?: number;
+  docType: DocType;
+  docStatus: DocStatus;
+  counterparty: string;
+  lineItems: LineItem[];
+  taxRate: string;
+  issuedAt: string;
+  dueAt: string;
+  validUntil: string;
+  notes: string;
+};
+
+const emptyDraft = (docType: DocType): Draft => ({
+  docType,
+  docStatus: "draft",
+  counterparty: "",
+  lineItems: [{ description: "", quantity: 1, unitPrice: 0 }],
+  taxRate: "20",
+  issuedAt: "",
+  dueAt: "",
+  validUntil: "",
+  notes: "",
+});
+
 
 export default function PrintWorkspace(p: Props) {
   const { t, tag, date } = useI18n();
@@ -127,7 +161,31 @@ export default function PrintWorkspace(p: Props) {
       r.transactionDate >= period.from &&
       r.transactionDate <= period.to);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [factureDraft, setFactureDraft] = useState<Draft | null>(null);
+  const [pdfBusy, setPdfBusy] = useState("");
+  const factures = p.records
+    .filter((r) => r.kind === "print_document" && !r.archived)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  
+  const [inlineTx, setInlineTx] = useState({
+    direction: "in" as "in" | "out",
+    date: p.today,
+    name: "",
+    party: "",
+    category: "",
+    orderId: "",
+    amount: "",
+  });
+  const [inlineOrder, setInlineOrder] = useState({
+    status: "new",
+    name: "",
+    party: "",
+    quantity: "1",
+    due: "",
+    amount: "",
+  });
   const [removingPayment, setRemovingPayment] = useState<RecordItem | null>(null);
+  const [deletingFacture, setDeletingFacture] = useState<RecordItem | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -177,7 +235,7 @@ export default function PrintWorkspace(p: Props) {
         ]
       : []),
     { id: "orders" as const, name: "Commandes", icon: Package },
-    { id: "tasks" as const, name: "Tâches", icon: CheckSquare },
+    { id: "factures" as const, name: "Factures", icon: FileSignature },
     { id: "team" as const, name: "Équipe", icon: Users },
   ];
   function navigate(next: Page) {
@@ -354,9 +412,11 @@ export default function PrintWorkspace(p: Props) {
                       ? "Chaque dirham reçu ou dépensé, au même endroit."
                       : page === "orders"
                         ? "De la demande à la livraison, gardez le fil."
-                        : page === "tasks"
-                          ? "Une équipe organisée, une production qui avance."
-                          : "Gérez les accès à votre espace impression.",
+                        : page === "factures"
+                          ? "Générez devis et factures pour vos clients."
+                          : page === "tasks"
+                            ? "Une équipe organisée, une production qui avance."
+                            : "Gérez les accès à votre espace impression.",
                 )}
               </p>
             </div>
@@ -367,12 +427,17 @@ export default function PrintWorkspace(p: Props) {
                     <button
                       className="btn"
                       disabled={disabled}
-                      onClick={() =>
-                        setEditor({
-                          kind: "print_transaction",
-                          direction: "out",
-                        })
-                      }
+                      onClick={() => {
+                        setAddingTx("out");
+                        setInlineTx({
+                          date: p.today,
+                          name: "",
+                          party: "",
+                          category: "",
+                          orderId: "",
+                          amount: "",
+                        });
+                      }}
                     >
                       <ArrowUpRight size={16} />
                       {t("Sortie")}
@@ -380,12 +445,17 @@ export default function PrintWorkspace(p: Props) {
                     <button
                       className="btn primary"
                       disabled={disabled}
-                      onClick={() =>
-                        setEditor({
-                          kind: "print_transaction",
-                          direction: "in",
-                        })
-                      }
+                      onClick={() => {
+                        setAddingTx("in");
+                        setInlineTx({
+                          date: p.today,
+                          name: "",
+                          party: "",
+                          category: "",
+                          orderId: "",
+                          amount: "",
+                        });
+                      }}
                     >
                       <Plus size={16} />
                       {t("Entrée")}
@@ -400,6 +470,28 @@ export default function PrintWorkspace(p: Props) {
                   >
                     <Plus size={16} />
                     {t("Nouvelle commande")}
+                  </button>
+                )}
+                                {page === "factures" && (
+                  <button
+                    className="btn primary"
+                    disabled={disabled}
+                    onClick={() => setFactureDraft({
+                      id: "",
+                      revision: 0,
+                      docType: "facture",
+                      docStatus: "draft",
+                      counterparty: "",
+                      lineItems: [{ description: "", quantity: 1, unitPrice: 0 }],
+                      taxRate: "20",
+                      issuedAt: p.today,
+                      dueAt: "",
+                      validUntil: "",
+                      notes: "",
+                    })}
+                  >
+                    <Plus size={16} />
+                    {t("Nouvelle facture")}
                   </button>
                 )}
                 {page === "tasks" && (
@@ -644,7 +736,175 @@ export default function PrintWorkspace(p: Props) {
               </div>
             </>
           )}
-          {["transactions", "orders", "tasks"].includes(page) && (
+          {page === "factures" && (
+            <section className="print-section">
+              {factures.length ? (
+                <div className="print-table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t("Numéro")}</th>
+                        <th>{t("Type")}</th>
+                        <th>{t("Client")}</th>
+                        <th>{t("Statut")}</th>
+                        <th>{t("Total")}</th>
+                        <th>{t("Émis le")}</th>
+                        <th className="action-col"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {factures.map((doc) => {
+                        const { total } = computeTotals(
+                          doc.lineItems || [],
+                          doc.taxRate,
+                        );
+                        // Backwards compatibility for incorrectly saved doc.number objects
+                        const docNum = typeof doc.number === "object" && doc.number !== null ? (doc.number as { number?: string }).number : doc.number;
+                        return (
+                          <tr key={doc.id}>
+                            <td>
+                              <strong>{docNum}</strong>
+                            </td>
+                            <td>{t(docLabels[doc.docType as DocType || "facture"])}</td>
+                            <td>{doc.counterparty}</td>
+                            <td>
+                              <span
+                                className={`status s${docStatusesFor[doc.docType as DocType || "facture"].indexOf((doc.docStatus as DocStatus) || "draft")}`}
+                              >
+                                {t(docStatusLabels[doc.docStatus as DocStatus] || doc.docStatus)}
+                              </span>
+                            </td>
+                            <td>{money(total * 100)}</td>
+                            <td>
+                              {doc.issuedAt
+                                ? date(`${doc.issuedAt}T12:00:00`, {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "—"}
+                            </td>
+                            <td className="action-col">
+                              {pdfBusy === doc.id ? (
+                                <Loader2 size={16} className="spin" />
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  title={t("Télécharger")}
+                                  onClick={async () => {
+                                    setPdfBusy(doc.id);
+                                    try {
+                                      const docNum = typeof doc.number === "object" && doc.number !== null ? (doc.number as { number?: string }).number : doc.number;
+                                      const html = printDocumentHtml({
+                                        ...doc,
+                                        number: docNum
+                                      });
+                                      
+                                      const iframe = document.createElement('iframe');
+                                      iframe.style.position = 'fixed';
+                                      iframe.style.right = '0';
+                                      iframe.style.bottom = '0';
+                                      iframe.style.width = '0';
+                                      iframe.style.height = '0';
+                                      iframe.style.border = '0';
+                                      document.body.appendChild(iframe);
+                                      
+                                      const docIframe = iframe.contentWindow?.document;
+                                      if (docIframe) {
+                                        docIframe.open();
+                                        docIframe.write(html);
+                                        docIframe.close();
+                                        // Cleanup after print dialog is closed
+                                        setTimeout(() => {
+                                          if (document.body.contains(iframe)) document.body.removeChild(iframe);
+                                          setPdfBusy("");
+                                        }, 3000);
+                                      } else {
+                                        setPdfBusy("");
+                                      }
+                                    } catch (e) {
+                                      setError(t("Génération du PDF impossible."));
+                                      setPdfBusy("");
+                                    }
+                                  }}
+                                >
+                                  <Download size={15} />
+                                </button>
+                              )}
+                              {doc.docStatus === "draft" && (
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  title={t("Modifier")}
+                                  onClick={() =>
+                                    setFactureDraft({
+                                      id: doc.id,
+                                      revision: doc.revision,
+                                      docType: doc.docType as DocType,
+                                      docStatus: (doc.docStatus as DocStatus) || "draft",
+                                      counterparty: doc.counterparty || "",
+                                      lineItems: doc.lineItems?.length
+                                        ? doc.lineItems
+                                        : [{ description: "", quantity: 1, unitPrice: 0 }],
+                                      taxRate: doc.taxRate != null ? String(doc.taxRate) : "20",
+                                      issuedAt: doc.issuedAt || "",
+                                      dueAt: doc.dueAt || "",
+                                      validUntil: doc.validUntil || "",
+                                      notes: doc.notes || "",
+                                    })
+                                  }
+                                >
+                                  <FileSignature size={15} />
+                                </button>
+                              )}
+                              {doc.docStatus !== "draft" && (
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  title={t("Archiver")}
+                                  disabled={disabled}
+                                  onClick={() =>
+                                    act({
+                                      action: "print-save",
+                                      kind: "print_document",
+                                      id: doc.id,
+                                      revision: doc.revision,
+                                      data: {
+                                        docType: doc.docType,
+                                        docStatus: doc.docStatus,
+                                        counterparty: doc.counterparty,
+                                        lineItems: doc.lineItems,
+                                        archived: true,
+                                      },
+                                    })
+                                  }
+                                >
+                                  <Archive size={15} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="icon-button danger"
+                                title={t("Supprimer")}
+                                disabled={disabled}
+                                onClick={() => setDeletingFacture(doc as unknown as RecordItem)}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                empty("Aucune facture")
+              )}
+            </section>
+          )}
+          {["transactions", "orders"].includes(page) && (
             <>
               {page === "transactions" && (
                 <div className="print-stats">
@@ -726,16 +986,115 @@ export default function PrintWorkspace(p: Props) {
                               "Montant",
                               "Actions",
                             ].map((h) => (
-                              <th key={h}>{t(h)}</th>
+                              <th key={h} style={{ width: colWidths[`mov_${h}`], position: 'relative' }}>
+                                {t(h)}
+                                <span className="col-resize-handle" onMouseDown={startColResize(`mov_${h}`)} role="separator" aria-orientation="vertical" />
+                              </th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
+                          {addingTx && (
+                            <tr className="print-inline-add">
+                              <td style={{ padding: "4px 8px" }}>
+                                <input
+                                  type="date"
+                                  value={inlineTx.date}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, date: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "115px" }}
+                                />
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <input
+                                  placeholder={t("Libellé")}
+                                  value={inlineTx.name}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, name: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "120px" }}
+                                />
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <input
+                                  placeholder={t("Interlocuteur")}
+                                  value={inlineTx.party}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, party: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "120px" }}
+                                />
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <input
+                                  placeholder={t("Catégorie")}
+                                  list="print-categories"
+                                  value={inlineTx.category}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, category: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "120px" }}
+                                />
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <select
+                                  value={inlineTx.orderId}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, orderId: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "120px", border: "1px solid #EDECEA", borderRadius: "4px" }}
+                                >
+                                  <option value="">{t("Aucune")}</option>
+                                  {orders.map((o) => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <input
+                                  type="number"
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  min="0.01"
+                                  value={inlineTx.amount}
+                                  onChange={(e) => setInlineTx({ ...inlineTx, amount: e.target.value })}
+                                  style={{ padding: "4px 6px", fontSize: "12px", width: "90px" }}
+                                />
+                              </td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <div className="print-table-actions" style={{ gap: "4px" }}>
+                                  <button
+                                    className="btn primary"
+                                    style={{ padding: "4px 8px", minHeight: "28px", fontSize: "11px" }}
+                                    disabled={disabled || !inlineTx.name || !inlineTx.party || !inlineTx.amount}
+                                    onClick={async () => {
+                                      const amountCents = Math.round(parseFloat(inlineTx.amount) * 100);
+                                      if (isNaN(amountCents) || amountCents <= 0) return;
+                                      const success = await act({
+                                        kind: "print_transaction",
+                                        direction: addingTx,
+                                        transactionDate: inlineTx.date || p.today,
+                                        name: inlineTx.name,
+                                        counterparty: inlineTx.party,
+                                        counterpartyType: addingTx === "in" ? "customer" : "supplier",
+                                        expenseCategory: inlineTx.category || (addingTx === "in" ? t("Paiement commande") : t("Fournitures")),
+                                        orderId: inlineTx.orderId || null,
+                                        amountCents,
+                                      });
+                                      if (success) setAddingTx(null);
+                                    }}
+                                  >
+                                    {t("Ajouter")}
+                                  </button>
+                                  <button
+                                    className="btn ghost"
+                                    style={{ padding: "4px 8px", minHeight: "28px", fontSize: "11px" }}
+                                    onClick={() => setAddingTx(null)}
+                                  >
+                                    {t("Annuler")}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                           {movements.map((r) => (
                             <tr
                               key={r.id}
                               className={r.archived ? "print-void" : ""}
+                              style={{ height: rowHeights[`mov_${r.id}`] ?? 46, position: 'relative' }}
                             >
+                              <span className="row-resize-handle" onMouseDown={startRowResize(`mov_${r.id}`)} role="separator" aria-orientation="horizontal" />
                               <td>{date(r.transactionDate)}</td>
                               <td>
                                 <span
@@ -810,7 +1169,9 @@ export default function PrintWorkspace(p: Props) {
                       </table>
                     </div>
                   ) : (
-                    empty("Aucun mouvement pour cette période")
+                    <div className="print-empty">
+                      {t("Aucune transaction enregistrée")}
+                    </div>
                   ))}
                 {page === "orders" &&
                   (shownOrders.length ? (
@@ -953,7 +1314,10 @@ export default function PrintWorkspace(p: Props) {
                               "Temps",
                               "Actions",
                             ].map((h) => (
-                              <th key={h}>{t(h)}</th>
+                              <th key={h} style={{ width: colWidths[`task_${h}`], position: 'relative' }}>
+                                {t(h)}
+                                <span className="col-resize-handle" onMouseDown={startColResize(`task_${h}`)} role="separator" aria-orientation="vertical" />
+                              </th>
                             ))}
                           </tr>
                         </thead>
@@ -973,7 +1337,8 @@ export default function PrintWorkspace(p: Props) {
                               ) / 60000,
                             );
                             return (
-                              <tr key={task.id}>
+                              <tr key={task.id} style={{ height: rowHeights[`task_${task.id}`] ?? 46, position: 'relative' }}>
+                                <span className="row-resize-handle" onMouseDown={startRowResize(`task_${task.id}`)} role="separator" aria-orientation="horizontal" />
                                 <td>
                                   <strong>{task.name}</strong>
                                   <small className="print-description">
@@ -1095,6 +1460,36 @@ export default function PrintWorkspace(p: Props) {
           )}
         </div>
       </main>
+      {factureDraft && (
+        <FactureEditor 
+          draft={factureDraft}
+          t={t}
+          
+          saving={saving}
+          onClose={() => setFactureDraft(null)}
+          onSave={async (doc) => {
+            const data = {
+              docType: doc.docType,
+              docStatus: doc.docStatus,
+              counterparty: doc.counterparty,
+              lineItems: doc.lineItems.filter((li) => li.description.trim()),
+              taxRate: doc.taxRate ? Number(doc.taxRate) : undefined,
+              issuedAt: doc.issuedAt || undefined,
+              dueAt: doc.dueAt || undefined,
+              validUntil: doc.validUntil || undefined,
+              notes: doc.notes || undefined,
+            };
+            const ok = await act({
+              action: "print-save",
+              kind: "print_document",
+              id: doc.id,
+              revision: doc.revision,
+              data,
+            });
+            if (ok) { setFactureDraft(null); p.onRefresh(); }
+          }}
+        />
+      )}
       <Dialog
         open={!!editor}
         onOpenChange={(open) => {
@@ -1146,9 +1541,7 @@ export default function PrintWorkspace(p: Props) {
                     data,
                   })
                 )
-                  setEditor(null);
-              }}
-            />
+                  setEditor(null); p.onRefresh(); } } />
           )}
         </DialogContent>
       </Dialog>
@@ -1179,11 +1572,51 @@ export default function PrintWorkspace(p: Props) {
                 event.preventDefault();
                 if (!removingPayment) return;
                 void act({
-                  action: "print-delete-payment",
+                  action: "print-delete",
                   id: removingPayment.id,
                   revision: removingPayment.revision,
                 }).then((ok) => {
                   if (ok) setRemovingPayment(null);
+                });
+              }}
+            >
+              {t(saving ? "Suppression…" : "Supprimer")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={!!deletingFacture}
+        onOpenChange={(open) => {
+          if (!open && !saving) setDeletingFacture(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Supprimer ce document ?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Cette facture/devis sera définitivement supprimée.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && (
+            <p className="print-alert" role="alert">
+              {error}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>{t("Annuler")}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={disabled}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!deletingFacture) return;
+                void act({
+                  action: "print-delete",
+                  id: deletingFacture.id,
+                  revision: deletingFacture.revision,
+                }).then((ok) => {
+                  if (ok) setDeletingFacture(null);
                 });
               }}
             >
@@ -1217,7 +1650,7 @@ function Choice({
   const [selection, setSelection] = useState(defaultValue);
   const selected = value ?? selection;
   return (
-    <>
+    <div className="form-field">
       <Select
         value={selected || "__none"}
         dir={dir}
@@ -1243,7 +1676,7 @@ function Choice({
         </SelectContent>
       </Select>
       {name && <input type="hidden" name={name} value={selected} />}
-    </>
+    </div>
   );
 }
 

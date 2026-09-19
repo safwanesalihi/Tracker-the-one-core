@@ -214,7 +214,7 @@ export async function POST(req: Request) {
 
     if (isPrintWorkspaceId(workspace.id)) {
       if (workspace.role === 'client') return response({ error: 'Accès non autorisé.' }, 403);
-      if (['print-save', 'print-task-status', 'print-delete-payment'].includes(body.action)) {
+      if (['print-save', 'print-task-status', 'print-delete'].includes(body.action)) {
         const changed = await mutatePrinting(workspace, owner, actor, body, rowsNow);
         if ('error' in changed) return response({ error: changed.error }, changed.status);
         return result({ id: changed.id });
@@ -428,7 +428,29 @@ export async function POST(req: Request) {
         clientId: task.clientId, author: actor, createdAt: now,
         ...(workspace.role === 'client' ? { audience: 'client' as const } : {}),
       };
-      await insert(comment);
+      
+      const statements: Statement[] = [insertRecord(comment, owner, workspace.id)];
+      
+      // Notify about the comment
+      statements.push(insertRecord({
+        id: `evt:${task.id}:comment:${now}`, kind: 'event', revision: 1, type: 'comment', audience: workspace.role === 'client' ? 'studio' : 'client',
+        name: `${actor} a commenté : « ${body.text.substring(0, 30)}${body.text.length > 30 ? '...' : ''} » sur la tâche « ${task.name} ».`, 
+        taskId: task.id, clientId: task.clientId, createdAt: now
+      }, 'system', workspace.id, true));
+
+      // Mentions parsing
+      const mentions = [...body.text.matchAll(/@([^\s]+)/g)].map(m => m[1]);
+      if (mentions.length > 0) {
+        mentions.forEach(mention => {
+          statements.push(insertRecord({
+            id: `evt:${task.id}:mention:${mention}:${now}`, kind: 'event', revision: 1, type: 'comment', audience: 'studio',
+            name: `${actor} vous a mentionné (@${mention}) sur la tâche « ${task.name} ».`, 
+            taskId: task.id, clientId: task.clientId, createdAt: now
+          }, 'system', workspace.id, true));
+        });
+      }
+
+      await batch(db, statements);
       return result();
     }
 
@@ -688,8 +710,10 @@ export async function POST(req: Request) {
       const parsed = documentFields.safeParse(body.data);
       if (!parsed.success) return response({ error: parsed.error.issues[0].message }, 400);
       const data = parsed.data;
-      const docClient = rowsNow.find((r) => r.kind === 'client' && r.id === data.clientId && !r.archived);
-      if (!docClient) return response({ error: 'Sélectionnez un client actif.' }, 400);
+      if (data.clientId !== 'internal') {
+        const docClient = rowsNow.find((r) => r.kind === 'client' && r.id === data.clientId && !r.archived);
+        if (!docClient) return response({ error: 'Sélectionnez un client actif.' }, 400);
+      }
       const docStatus: DocStatus = data.docStatus || existing?.docStatus || 'draft';
       if (!docStatusesFor[data.docType].includes(docStatus)) return response({ error: 'Statut invalide pour ce type de document.' }, 400);
 
@@ -831,7 +855,7 @@ export async function POST(req: Request) {
     if (existing?.demo && existing.deliverable === '/demo-deliverable.html' && !data.deliverable) {
       data.deliverable = existing.deliverable;
     }
-    if (body.kind !== 'client') {
+    if (body.kind !== 'client' && data.clientId !== 'internal') {
       const client = rows.find((record) => record.kind === 'client' && record.id === data.clientId);
       if (!client || (client.archived && !data.archived)) {
         return response({ error: 'Sélectionnez un client actif.' }, 400);
@@ -885,6 +909,14 @@ export async function POST(req: Request) {
     } as RecordItem;
     if (lockLifted) item.lockOverride = true;
     const statusChanged = data.status !== existing?.status;
+    // Add task creation/assignment event
+    if (body.kind === 'task' && body.action === 'create' && data.assignee) {
+      statements.push(insertRecord({
+        id: `evt:${body.id}:assigned:${now}`, kind: 'event', revision: 1, type: 'assignment', audience: 'studio',
+        name: `${actor} a assigné la tâche « ${data.name} » à ${data.assignee}.`, taskId: body.id, clientId: data.clientId, createdAt: now
+      }, 'system', workspace.id, true));
+    }
+    
     if (body.kind === 'task' && statusChanged) {
       if (data.status === 'À valider') item = sendForValidation({ ...item, status: existing?.status }, now);
       else if (data.status === 'Validé') item = approve({ ...item, status: existing?.status }, { mode: 'studio', by: actor, email: user.email, at: now, round: item.revisionRound ?? 0 });

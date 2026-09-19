@@ -6,7 +6,7 @@
   min-height: 100dvh;
   background: #f6f7f9;
   color: var(--print-ink);
-  font-family: Inter, sans-serif;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
 }
 .print-app button,
@@ -335,28 +335,41 @@
   border-collapse: collapse;
   white-space: nowrap;
   text-align: start;
-  font-size: 11px;
+  font-size: 12px;
 }
 .print-app th {
-  font-weight: 500;
-  background: #f6f7f9;
-  color: #69717e;
+  font-weight: 600;
+  background: #f8fafc;
+  color: #64748b;
   text-align: start;
-  padding: 14px 18px;
-  font-size: 10px;
-  border-bottom: 1px solid var(--print-line);
+  padding: 16px 18px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid #e2e8f0;
 }
 .print-app td {
-  padding: 17px 18px;
-  border-bottom: 1px solid #e8eaee;
-  color: #20232a;
+  padding: 18px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
   max-width: 320px;
   white-space: normal;
   overflow-wrap: anywhere;
   min-width: 110px;
+  transition: all 0.2s ease;
+}
+.print-app tr {
+  transition: all 0.2s ease;
+  background: #ffffff;
+}
+.print-app tr:hover td {
+  background: #fbfdff;
+  border-bottom-color: transparent;
+  box-shadow: inset 0 -1px 0 0 #e2e8f0, inset 0 1px 0 0 #e2e8f0;
 }
 .print-app td strong {
   font-weight: 500;
+  color: #0f172a;
 }
 .print-app td small {
   display: block;
@@ -648,4 +661,337 @@
   .print-app .team-page > * {
     min-width: 0;
   }
+}
+
+.print-inline-add td {
+  background: #fbfdff;
+  border-bottom: 2px solid #e2e8f0;
+}
+.print-inline-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px !important;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #e3e6eb !important;
+  border-radius: 6px !important;
+}
+.print-inline-input:focus {
+  border-color: #20232a !important;
+}
+.quantity-input {
+  width: 70px;
+}
+
+
+/* TRUE GLASSMORPHISM OVERRIDES V2 - HIGH CONTRAST & UNIFIED */
+body {
+    background-color: #f4f6fa !important;
+    background-image: 
+        radial-gradient(at 80% 0%, hsla(222,100%,75%,0.25) 0px, transparent 50%), 
+        radial-gradient(at 0% 50%, hsla(28,100%,74%,0.25) 0px, transparent 50%), 
+        radial-gradient(at 80% 100%, hsla(282,100%,75%,0.25) 0px, transparent 50%) !important;
+    background-attachment: fixed !important;
+    color: #111 !important;
+}
+
+.workspace {
+    background: transparent !important;
+}
+
+/* Darker Sidebar */
+.tracker-sidebar [data-slot=sidebar-inner], 
+.tracker-sidebar,
+.sidebar {
+    background: rgba(12, 14, 18, 0.95) !important;
+    backdrop-filter: blur(40px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+    border-right: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* Topbar Glass */
+.topbar {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(30px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(200%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Unified Glass Panels */
+.metric-card, .work-panel, .review-panel, .setup-card, .onboarding-card, 
+.client-card, .board-card, .tracker-modal, .database-card, .calendar-wrap, 
+.detail-split, .workflow, .review-layout, .auth-form, .team-card, .portal-card,
+.team-summary > div, .team-lower > section, .auth-preview-card, .client-strip > button,
+.portal-stats, .portal-banner, .portal-empty, .portal-receipt, .deliverable, .sample-document {
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+/* Make tables transparent so the glass container shows through */
+.task-table, .task-table tr, .task-table th, .task-table td, .table-area {
+    background: transparent !important;
+    border-color: rgba(0,0,0,0.05) !important;
+}
+.task-table th {
+    color: #444 !important;
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+.task-table tr:hover td {
+    background: rgba(255,255,255,0.5) !important;
+}
+
+/* Individual list rows (Tasks, Projects, Members) */
+.task-line, .project-row, .member-row, .approval-list > button, .search-results > button {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+    border-radius: 12px !important;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
+}
+.task-line:hover, .project-row:hover, .member-row:hover, .approval-list > button:hover, .search-results > button:hover {
+    background: rgba(255, 255, 255, 0.75) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04) !important;
+    border-color: transparent !important;
+}
+
+/* Kanban Board Columns */
+.board-column {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border: 1px dashed rgba(0,0,0,0.08) !important;
+    border-radius: 16px !important;
+}
+
+/* Calendar */
+.calendar-grid, .calendar-day, .weekdays > span, .calendar-event {
+    background: transparent !important;
+    border-color: rgba(0,0,0,0.05) !important;
+}
+.calendar-day.outside {
+    background: rgba(0,0,0,0.02) !important;
+}
+.calendar-event {
+    background: rgba(255,255,255,0.7) !important;
+    border: 1px solid rgba(255,255,255,0.8) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
+}
+
+/* Vibrant Primary Buttons */
+.btn.primary {
+    background: #EFB849 !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 4px 15px rgba(239, 184, 73, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    color: #111 !important;
+    text-shadow: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+
+/* Inputs & Selects inside glass */
+input, textarea, .pick, .search-input {
+    background: rgba(255,255,255,0.5) !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+}
+input:focus, textarea:focus, .pick:focus-within {
+    background: rgba(255,255,255,0.9) !important;
+    border-color: #EFB849 !important;
+    box-shadow: 0 0 0 3px rgba(239, 184, 73, 0.2) !important;
+}
+
+
+/* UI FIXES & AUDIT CORRECTIONS */
+.search-input {
+    border-radius: 8px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+}
+.search-input input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 8px 0 !important;
+}
+.search-input input:focus {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Fix any buttons inside client strips or rows that might have lost their layout */
+.client-strip > button {
+    border-radius: 0 !important;
+    border-right: 1px solid rgba(0,0,0,0.05) !important;
+    border-bottom: none !important;
+}
+.client-strip > button:last-child {
+    border-right: none !important;
+}
+
+/* Ensure SVG icons inside search inputs align correctly */
+.search-input svg {
+    margin-right: 8px !important;
+    color: #687384 !important;
+}
+
+/* Make sure checkboxes keep their original appearance instead of becoming glass boxes */
+input[type="checkbox"], input[type="radio"] {
+    background: #fff !important;
+    border: 1px solid rgba(0,0,0,0.2) !important;
+}
+input[type="checkbox"]:focus, input[type="radio"]:focus {
+    box-shadow: none !important;
+}
+
+
+/* PRINT GLASSMORPHISM OVERRIDES */
+.print-app {
+    background-color: #f4f6fa !important;
+    background-image: 
+        radial-gradient(at 80% 0%, hsla(222,100%,75%,0.25) 0px, transparent 50%), 
+        radial-gradient(at 0% 50%, hsla(28,100%,74%,0.25) 0px, transparent 50%), 
+        radial-gradient(at 80% 100%, hsla(282,100%,75%,0.25) 0px, transparent 50%) !important;
+    background-attachment: fixed !important;
+    color: #111 !important;
+}
+
+/* Glass Panels */
+.print-panel, .print-stat, .print-order, .print-dialog, .print-alert, .print-notice {
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+}
+
+/* First Stat Card Dark Treatment (Matching the metric-card:first-child) */
+.print-stat:first-child {
+    background: rgba(15, 18, 25, 0.85) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+.print-stat:first-child span, .print-stat:first-child small {
+    color: rgba(255,255,255,0.7) !important;
+}
+.print-stat:first-child strong {
+    color: #fff !important;
+}
+
+/* Contrast Fixes */
+.print-eyebrow, .print-heading p, .print-order-meta, .print-progress span, 
+.print-workload small, .print-description, .print-panel-title small {
+    color: #475569 !important;
+}
+.print-heading h1, .print-panel-title, .print-order-amount, .print-stat strong {
+    color: #0f172a !important;
+}
+.print-stat:first-child strong {
+    color: #fff !important; /* Exclude dark card */
+}
+
+/* Table overrides */
+.print-list, .print-table-scroll table, .print-list tr, .print-list th, .print-list td {
+    background: transparent !important;
+    border-color: rgba(0,0,0,0.05) !important;
+}
+.print-list th {
+    color: #475569 !important;
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+.print-list td {
+    color: #334155 !important;
+}
+.print-list tr:hover td {
+    background: rgba(255,255,255,0.5) !important;
+}
+
+/* Search and Inputs */
+.print-search input, .print-app select, .print-app input, .print-dialog input, .print-dialog textarea {
+    background: rgba(255,255,255,0.5) !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+}
+.print-search input:focus, .print-app select:focus, .print-app input:focus, .print-dialog input:focus {
+    background: rgba(255,255,255,0.9) !important;
+    border-color: #EFB849 !important;
+    box-shadow: 0 0 0 3px rgba(239, 184, 73, 0.2) !important;
+}
+.print-search {
+    border-radius: 8px !important;
+}
+.print-search input {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+
+/* MODAL CONTRAST FIXES */
+/* Pop-up windows need higher opacity to stand out against the page background, while keeping the glass blur */
+.tracker-modal, .print-dialog, [role="dialog"] {
+    background: rgba(255, 255, 255, 0.90) !important;
+    backdrop-filter: blur(40px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0,0,0,0.05) !important;
+    color: #111 !important;
+}
+
+/* Modal text contrast */
+.tracker-modal [data-slot=dialog-title], .print-dialog h2 {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+}
+.tracker-modal [data-slot=dialog-description], .print-dialog p {
+    color: #475569 !important;
+}
+
+/* Dim the background behind the modal if Shadcn uses standard Tailwind classes */
+div[data-state="open"] > .fixed.inset-0, 
+div[data-state="open"] > .bg-black\/80, 
+.DialogOverlay {
+    background: rgba(15, 23, 42, 0.4) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+
+/* BUTTON CONTRAST FIXES */
+/* Ensure all primary action buttons have punchy, premium contrast and are not washed out */
+.btn.primary, button.primary {
+    background: #EFB849 !important;
+    color: #0f172a !important; /* Deep, dark text for high contrast */
+    border: 1px solid rgba(0, 0, 0, 0.1) !important; /* Subtle dark edge, not white */
+    box-shadow: 0 4px 12px rgba(239, 184, 73, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    text-shadow: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    opacity: 1 !important; /* Prevent any glassmorphism fading */
+}
+
+.btn.primary:hover, button.primary:hover {
+    background: #E5A93C !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(239, 184, 73, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+/* If a button is disabled, gray it out instead of just lowering opacity to avoid the 'washed out' look on gradients */
+.btn.primary:disabled, button.primary:disabled {
+    background: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    transform: none !important;
+    cursor: not-allowed !important;
+}
+
+/* Ensure icons inside primary buttons inherit the dark color properly */
+.btn.primary svg, button.primary svg {
+    color: #0f172a !important;
+    stroke-width: 2.5px !important; /* Make the icon slightly thicker for visibility */
 }

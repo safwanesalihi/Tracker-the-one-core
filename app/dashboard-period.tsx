@@ -1,7 +1,13 @@
 "use client";
 import { useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
@@ -42,16 +48,19 @@ export default function DashboardPeriod({
   );
   return (
     <div className="dashboard-period-controls">
-      <Tabs value={value} onValueChange={onChange} dir={dir}>
-        <TabsList aria-label={t("Période")}>
-          <TabsTrigger value="month">{t("Ce mois")}</TabsTrigger>
-          <TabsTrigger value="previous">{t("Mois précédent")}</TabsTrigger>
-          <TabsTrigger value="30">{t("30 jours")}</TabsTrigger>
+      <Select value={value} onValueChange={onChange} dir={dir}>
+        <SelectTrigger className="pick" aria-label={t("Période")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="month">{t("Ce mois")}</SelectItem>
+          <SelectItem value="previous">{t("Mois précédent")}</SelectItem>
+          <SelectItem value="30">{t("30 jours")}</SelectItem>
           {onMonthChange && (
-            <TabsTrigger value="all">{t("Tout l’historique")}</TabsTrigger>
+            <SelectItem value="all">{t("Tout l’historique")}</SelectItem>
           )}
-        </TabsList>
-      </Tabs>
+        </SelectContent>
+      </Select>
       {onMonthChange && (
         <Popover
           open={open}

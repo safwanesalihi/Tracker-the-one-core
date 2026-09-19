@@ -14,7 +14,7 @@ export async function mutatePrinting(
 ) {
   const fail = (error: string, status: number) => ({ error, status });
   if (
-    !["print-save", "print-task-status", "print-delete-payment"].includes(
+    !["print-save", "print-task-status", "print-delete"].includes(
       String(body.action),
     )
   )
@@ -24,13 +24,13 @@ export async function mutatePrinting(
   if (body.id && !existing) return fail("Élément introuvable.", 404);
   if (existing && body.revision !== existing.revision)
     return fail("Cet élément a changé. Actualisez avant de réessayer.", 409);
-  if (body.action === "print-delete-payment") {
+  if (body.action === "print-delete") {
     if (!isManager(workspace.role))
       return fail("Réservé au propriétaire et aux administrateurs.", 403);
-    if (!existing || existing.kind !== "print_transaction")
-      return fail("Mouvement introuvable.", 404);
+    if (!existing || (existing.kind !== "print_transaction" && existing.kind !== "print_document"))
+      return fail("Élément introuvable ou non supprimable.", 404);
     const deleted = await database().query(
-      "DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND kind = 'print_transaction' AND revision = $3 RETURNING id",
+      "DELETE FROM records WHERE workspace_id = $1 AND id = $2 AND revision = $3 RETURNING id",
       [workspace.id, existing.id, body.revision],
     );
     if (!deleted.length)
@@ -95,6 +95,16 @@ export async function mutatePrinting(
       delete item.projectId;
       delete item.approvalDueAt;
       delete item.signOff;
+    }
+    if (kind === "print_document") {
+      if (!item.number) {
+        const { nextDocNumber } = await import("./documents");
+        const existingNumbers = rows
+          .filter((r) => r.kind === "print_document" && r.docType === item.docType && r.number)
+          .map((r) => r.number as string);
+        const year = new Date(item.issuedAt || item.createdAt || now).getFullYear();
+        item.number = nextDocNumber(existingNumbers, item.docType as import("./model").DocType, year).number;
+      }
     }
   }
   item.history = [

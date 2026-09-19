@@ -62,8 +62,8 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
     } catch (error) { setError((error as Error).message); setBusy(false); }
   }
 
-  return <div className="auth-screen">
-    <div className="auth-form google-login">
+  return <div className="login-root">
+    <div className="login-sidebar google-login">
       <img className="auth-logo" src="/the-one-core-logo.svg" alt="The One Core" />
       {step === 'sign-in' ? <>
         <h1>{t('Bienvenue')}<span className="wordmark-dot">.</span></h1>
@@ -91,7 +91,7 @@ export default function Login({ initialStep = 'sign-in', email: knownEmail = '' 
       {error && <p className="form-error" role="alert">{error}</p>}
       <small className="auth-privacy"><Lock size={14} />{t('Vos données restent privées. Les mots de passe sont stockés hachés et jamais en clair.')}</small>
     </div>
-    <div className="auth-flow"><div className="auth-preview">
+    <div className="login-showcase-container"><div className="auth-preview">
       <h2>{t('Tout le travail')}<br />{t('au même endroit.')}</h2>
       <LoginShowcase />
     </div></div>

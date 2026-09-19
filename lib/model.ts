@@ -22,7 +22,7 @@ export type LineItem = { description: string; quantity: number; unitPrice: numbe
 
 export type RecordItem = {
   id: string;
-  kind: 'client' | 'project' | 'task' | 'comment' | 'event' | 'library' | 'document' | 'print_order' | 'print_transaction';
+  kind: 'client' | 'project' | 'task' | 'comment' | 'event' | 'library' | 'document' | 'print_order' | 'print_transaction' | 'editorial_post';
   // Printing records use the same workspace-scoped store, without studio client entities.
   orderId?: string;
   counterparty?: string;
