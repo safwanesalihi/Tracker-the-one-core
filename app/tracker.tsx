@@ -1650,7 +1650,7 @@ export default function Tracker() {
                      </select>
                   </TableCell>
                   <TableCell>
-                    <input type="date" className="inline-input w-full" value={inlineTask.due || ''} onChange={e => setInlineTask({...inlineTask, due: e.target.value})} />
+                    <DatePicker className="inline-input w-full" label={tr("Échéance")} value={inlineTask.due || ''} onChange={v => setInlineTask({...inlineTask, due: v})} placeholder="jj/mm/aaaa" />
                   </TableCell>
                   <TableCell colSpan={owner || manager ? 5 : 4}>
                     <div className="flex items-center gap-2">

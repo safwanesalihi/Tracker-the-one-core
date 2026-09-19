@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useI18n } from '@/app/locale-provider';
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-type Props = { value?: string; onChange: (value: string) => void; label: string; placeholder?: string };
+type Props = { value?: string; onChange: (value: string) => void; label: string; placeholder?: string; className?: string };
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const keyFor = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -27,7 +27,7 @@ function monthDays(month: Date) {
   });
 }
 
-export default function DatePicker({ value = '', onChange, label, placeholder }: Props) {
+export default function DatePicker({ value = '', onChange, label, placeholder, className }: Props) {
   const { t, tag, rtl } = useI18n();
   placeholder ??= t('Choisir une date');
   const [open, setOpen] = useState(false);
@@ -37,7 +37,7 @@ export default function DatePicker({ value = '', onChange, label, placeholder }:
 
   return <Popover open={open} onOpenChange={changeOpen}><div className="date-picker">
     <PopoverTrigger asChild>
-    <button type="button" className={`date-picker-trigger ${value ? 'has-value' : ''}`} aria-label={label} aria-expanded={open} >
+    <button type="button" className={`date-picker-trigger ${value ? 'has-value' : ''} ${className || ''}`} aria-label={label} aria-expanded={open} >
       <CalendarDays size={15} /> <span>{dateLabel(value, tag) || placeholder}</span>
     </button></PopoverTrigger>
     <PopoverContent className="date-picker-popover" align="start" sideOffset={8} collisionPadding={12} aria-label={label} dir={rtl ? "rtl" : "ltr"}>
