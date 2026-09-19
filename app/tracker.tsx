@@ -1634,30 +1634,30 @@ export default function Tracker() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2 items-center text-xs">
-                       <select className="inline-input" value={inlineTask.clientId || "internal"} onChange={e => setInlineTask({...inlineTask, clientId: e.target.value})}>
+                       <select className="inline-input w-full" value={inlineTask.clientId || "internal"} onChange={e => setInlineTask({...inlineTask, clientId: e.target.value})}>
                           <option value="internal">Interne</option>
                           {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                        </select>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <input className="inline-input" placeholder="Projet" value={inlineTask.projectId || ''} onChange={e => setInlineTask({...inlineTask, projectId: e.target.value})} />
+                    <input className="inline-input w-full" placeholder="Projet" value={inlineTask.projectId || ''} onChange={e => setInlineTask({...inlineTask, projectId: e.target.value})} />
                   </TableCell>
                   <TableCell>
-                     <select className="inline-input" value={inlineTask.assignee || ""} onChange={e => setInlineTask({...inlineTask, assignee: e.target.value})}>
+                     <select className="inline-input w-full" value={inlineTask.assignee || ""} onChange={e => setInlineTask({...inlineTask, assignee: e.target.value})}>
                         <option value="">Non assigné</option>
                         {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                      </select>
                   </TableCell>
                   <TableCell>
-                    <input type="date" className="inline-input" value={inlineTask.due || ''} onChange={e => setInlineTask({...inlineTask, due: e.target.value})} />
+                    <input type="date" className="inline-input w-full" value={inlineTask.due || ''} onChange={e => setInlineTask({...inlineTask, due: e.target.value})} />
                   </TableCell>
                   <TableCell colSpan={owner || manager ? 5 : 4}>
                     <div className="flex items-center gap-2">
-                      <button className="btn primary" style={{ padding: '0 12px', height: '32px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={submitInlineTask}>
+                      <button className="btn primary h-8 px-3 text-sm flex items-center gap-1" onClick={submitInlineTask}>
                         <Check size={14}/> {tr("Valider")}
                       </button>
-                      <button className="icon-button" style={{ height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setInlineTask(null)}>
+                      <button className="icon-button ghost h-8 w-8 flex items-center justify-center" onClick={() => setInlineTask(null)}>
                         <X size={16}/>
                       </button>
                     </div>
