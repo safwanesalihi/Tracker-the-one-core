@@ -1633,21 +1633,45 @@ export default function Tracker() {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2 items-center text-xs">
-                       <select className="inline-input w-full" value={inlineTask.clientId || "internal"} onChange={e => setInlineTask({...inlineTask, clientId: e.target.value})}>
-                          <option value="internal">Interne</option>
-                          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                       </select>
-                    </div>
+                    <Select value={inlineTask.clientId || "internal"} onValueChange={v => setInlineTask({...inlineTask, clientId: v})}>
+                      <SelectTrigger className="inline-input w-full h-8 px-2" aria-label={tr("Client")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="internal">{tr("Interne")}</SelectItem>
+                        {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <input className="inline-input w-full" placeholder="Projet" value={inlineTask.projectId || ''} onChange={e => setInlineTask({...inlineTask, projectId: e.target.value})} />
                   </TableCell>
                   <TableCell>
-                     <select className="inline-input w-full" value={inlineTask.assignee || ""} onChange={e => setInlineTask({...inlineTask, assignee: e.target.value})}>
-                        <option value="">Non assigné</option>
-                        {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                     </select>
+                    <Select value={inlineTask.assignee || "unassigned"} onValueChange={v => setInlineTask({...inlineTask, assignee: v === "unassigned" ? "" : v})}>
+                      <SelectTrigger className="inline-input w-full h-8 px-2" aria-label={tr("Assigné")}>
+                        <SelectValue>
+                          {inlineTask.assignee ? (
+                            <span className="flex items-center gap-2">
+                              <Avatar name={inlineTask.assignee} avatar={avatarOf(inlineTask.assignee)} />
+                              <span className="truncate">{inlineTask.assignee}</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">{tr("Non assigné")}</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">{tr("Non assigné")}</SelectItem>
+                        {members.map(m => (
+                          <SelectItem key={m.id} value={m.name}>
+                            <span className="flex items-center gap-2">
+                              <Avatar name={m.name} avatar={m.avatar} />
+                              {m.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <DatePicker className="inline-input w-full" label={tr("Échéance")} value={inlineTask.due || ''} onChange={v => setInlineTask({...inlineTask, due: v})} placeholder="jj/mm/aaaa" />

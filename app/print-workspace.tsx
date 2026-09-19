@@ -986,9 +986,9 @@ export default function PrintWorkspace(p: Props) {
                               "Montant",
                               "Actions",
                             ].map((h) => (
-                              <th key={h} style={{ width: colWidths[`mov_${h}`], position: 'relative' }}>
+                              <th key={h} >
                                 {t(h)}
-                                <span className="col-resize-handle" onMouseDown={startColResize(`mov_${h}`)} role="separator" aria-orientation="vertical" />
+                                
                               </th>
                             ))}
                           </tr>
@@ -1092,9 +1092,9 @@ export default function PrintWorkspace(p: Props) {
                             <tr
                               key={r.id}
                               className={r.archived ? "print-void" : ""}
-                              style={{ height: rowHeights[`mov_${r.id}`] ?? 46, position: 'relative' }}
+                              
                             >
-                              <span className="row-resize-handle" onMouseDown={startRowResize(`mov_${r.id}`)} role="separator" aria-orientation="horizontal" />
+                              
                               <td>{date(r.transactionDate)}</td>
                               <td>
                                 <span
@@ -1314,9 +1314,9 @@ export default function PrintWorkspace(p: Props) {
                               "Temps",
                               "Actions",
                             ].map((h) => (
-                              <th key={h} style={{ width: colWidths[`task_${h}`], position: 'relative' }}>
+                              <th key={h} >
                                 {t(h)}
-                                <span className="col-resize-handle" onMouseDown={startColResize(`task_${h}`)} role="separator" aria-orientation="vertical" />
+                                
                               </th>
                             ))}
                           </tr>
@@ -1337,8 +1337,8 @@ export default function PrintWorkspace(p: Props) {
                               ) / 60000,
                             );
                             return (
-                              <tr key={task.id} style={{ height: rowHeights[`task_${task.id}`] ?? 46, position: 'relative' }}>
-                                <span className="row-resize-handle" onMouseDown={startRowResize(`task_${task.id}`)} role="separator" aria-orientation="horizontal" />
+                              <tr key={task.id} >
+                                
                                 <td>
                                   <strong>{task.name}</strong>
                                   <small className="print-description">
