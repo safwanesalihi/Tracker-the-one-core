@@ -1430,8 +1430,8 @@ export default function Tracker() {
                     [Folder, "Sous-projet", "project"],
                     [UserRound, "Assigné", "assignee"],
                     [CalendarDays, "Échéance", "due"],
-                    [LinkIcon, "Livrable", "deliverable"],
                     [Flag, "Source", "source"],
+                    [LinkIcon, "Livrable", "deliverable"],
                     [Megaphone, "Camp", "channel"],
                     ...(owner || manager ? [[Clock, "Temps", "time"] as [LucideIcon, string, string]] : []),
                   ] as [LucideIcon, string, string][]
@@ -1511,22 +1511,6 @@ export default function Tracker() {
                     {dateLabel(t.due)}
                   </TableCell>
                   <TableCell>
-                    {link(t) ? (
-                      <a
-                        className="file-pill"
-                        href={link(t)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <FileText size={13} />
-                        {tr(t.demo ? "Exemple" : "Ouvrir")}
-                        <ArrowUpRight size={12} />
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
                     {t.source?.startsWith("http") ? (
                       <a
                         className="source-link"
@@ -1540,6 +1524,22 @@ export default function Tracker() {
                       </a>
                     ) : t.source ? (
                       tr(t.source)
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {link(t) ? (
+                      <a
+                        className="file-pill"
+                        href={link(t)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <FileText size={13} />
+                        {tr(t.demo ? "Exemple" : "Ouvrir")}
+                        <ArrowUpRight size={12} />
+                      </a>
                     ) : (
                       "—"
                     )}
