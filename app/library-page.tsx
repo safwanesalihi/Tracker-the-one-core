@@ -19,7 +19,7 @@ type Props = {
   onRefresh: () => void;
 };
 
-const categoryLabels: Record<LibraryCategory, string> = { prompt: 'Prompt', asset: 'Asset', plugin: 'Plugin', preset: 'Preset' };
+const categoryLabels: Record<LibraryCategory, string> = { prompt: 'Prompt', asset: 'Asset', plugin: 'Plugin', preset: 'Preset', website: 'Site web utile' };
 type Draft = { id?: string; revision?: number; name: string; category: LibraryCategory; content: string; link: string; description: string };
 const emptyDraft: Draft = { name: '', category: 'prompt', content: '', link: '', description: '' };
 

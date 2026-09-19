@@ -12,7 +12,7 @@ export type SignOff = {
   round: number;
 };
 
-export const libraryCategories = ['prompt', 'asset', 'plugin', 'preset'] as const;
+export const libraryCategories = ['prompt', 'asset', 'plugin', 'preset', 'website'] as const;
 export type LibraryCategory = typeof libraryCategories[number];
 export const docTypes = ['devis', 'facture', 'contract'] as const;
 export type DocType = typeof docTypes[number];
