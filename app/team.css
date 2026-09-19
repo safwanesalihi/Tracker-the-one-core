@@ -267,3 +267,20 @@ h1, h2, h3, strong, .task-line-name strong, .table-name, .board-name,
 .text-link, .btn.ghost {
     color: #334155 !important;
 }
+
+/* Fix inline input padding and height */
+.inline-input {
+    height: 32px !important;
+    border-radius: 8px !important;
+    padding: 0 10px !important;
+    display: flex;
+    align-items: center;
+}
+select.inline-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 5 3 3 3-3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 8px;
+    padding-right: 24px !important;
+}

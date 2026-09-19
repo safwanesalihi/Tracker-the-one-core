@@ -1652,9 +1652,15 @@ export default function Tracker() {
                   <TableCell>
                     <input type="date" className="inline-input" value={inlineTask.due || ''} onChange={e => setInlineTask({...inlineTask, due: e.target.value})} />
                   </TableCell>
-                  <TableCell colSpan={4}>
-                    <button className="btn primary !p-1 !h-7" onClick={submitInlineTask}><Check size={14}/> {tr("Valider")}</button>
-                    <button className="btn ghost !p-1 !h-7 ml-2" onClick={() => setInlineTask(null)}><X size={14}/></button>
+                  <TableCell colSpan={owner || manager ? 5 : 4}>
+                    <div className="flex items-center gap-2">
+                      <button className="btn primary" style={{ padding: '0 12px', height: '32px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={submitInlineTask}>
+                        <Check size={14}/> {tr("Valider")}
+                      </button>
+                      <button className="icon-button" style={{ height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setInlineTask(null)}>
+                        <X size={16}/>
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
